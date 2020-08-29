@@ -5,9 +5,9 @@ import java.net.URI
 import upickle.default._
 
 case class AlbumJson(album_type: String,
-                     artists: List[Artist],
+                     artists: List[ArtistJson],
                      available_markets: List[String],
-                     copyrights: List[Copyright],
+                     copyrights: List[CopyrightJson],
                      external_ids: Map[String, String],
                      external_urls: Map[String, String],
                      genres: List[String],
@@ -19,8 +19,8 @@ case class AlbumJson(album_type: String,
                      popularity: Int,
                      release_date: String,
                      release_date_precision: String,
-                     restrictions: Restrictions,
-                     tracks: Paging[Track],
+                     restrictions: Option[Restrictions] = None,
+                     tracks: Paging[TrackJson],
                      `type`: String,
                      uri: String)
 
@@ -75,7 +75,7 @@ case class Album(albumType: AlbumType,
                  popularity: Int,
                  releaseDate: String,
                  releaseDatePrecision: ReleaseDatePrecision,
-                 restrictions: Restrictions,
+                 restrictions: Option[Restrictions] = None,
                  tracks: Paging[Track],
                  objectType: String,
                  uri: URI)
@@ -83,9 +83,9 @@ case class Album(albumType: AlbumType,
 object Album {
   def fromJson(json: AlbumJson): Album =
     Album(AlbumType.fromString(json.album_type),
-      json.artists,
+      json.artists.map(Artist.fromJson),
       json.available_markets,
-      json.copyrights,
+      json.copyrights.map(Copyright.fromJson),
       json.external_ids,
       json.external_urls,
       json.genres,
@@ -98,7 +98,7 @@ object Album {
       json.release_date,
       ReleaseDatePrecision.fromString(json.release_date_precision),
       json.restrictions,
-      json.tracks,
+      json.tracks.copy(items = json.tracks.items.map(Track.fromJson)),
       json.`type`,
       URI.create(json.uri))
 }

@@ -6,13 +6,13 @@ import upickle.default._
 
 case class ArtistJson(
                        external_urls: Map[String, String],
-                       followers: Followers,
-                       genres: List[String],
+                       followers: Option[Followers] = None,
+                       genres: Option[List[String]] = None,
                        href: String,
                        id: String,
-                       images: List[Image],
+                       images: Option[List[Image]] = None,
                        name: String,
-                       popularity: Int,
+                       popularity: Option[Int] = None,
                        `type`: String,
                        uri: String
                      )
@@ -23,13 +23,13 @@ object ArtistJson {
 
 case class Artist(
                    externalUrls: Map[String, String],
-                   followers: Followers,
-                   genres: List[String],
+                   followers: Option[Followers],
+                   genres: Option[List[String]],
                    href: String,
                    id: String,
-                   images: List[Image],
+                   images: Option[List[Image]],
                    name: String,
-                   popularity: Int,
+                   popularity: Option[Int],
                    objectType: String,
                    uri: URI
                  )

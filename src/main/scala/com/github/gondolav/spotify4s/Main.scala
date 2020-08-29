@@ -11,8 +11,8 @@ object Main {
   val clientSecret = "d57182bc22304585b6837788f73bdad1"
 
   def main(args: Array[String]): Unit = {
-    val s = Spotify(ClientCredentials("0", "0"))
-    println(s.getAlbum("0sNOF9WDwhWunNAHPD3Baj"))
+    val s = Spotify(ClientCredentials(clientID, clientSecret))
+    println(s.getAlbums(List("41MnTivkwTO3UUJ8DrqEJJ", "6JWc4iAiJ9FjyK0B59ABb4", "6UXCm6bOO4gFlDQZV5yL37")))
   }
 
 }

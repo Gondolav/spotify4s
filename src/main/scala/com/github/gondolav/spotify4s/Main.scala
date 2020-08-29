@@ -1,8 +1,6 @@
-package com.github.gondola.spotify4s
+package com.github.gondolav.spotify4s
 
-import java.util.Base64
-
-import com.github.gondola.spotify4s.auth.ClientCredentials
+import com.github.gondolav.spotify4s.auth.ClientCredentials
 
 object Main {
 
@@ -13,7 +11,7 @@ object Main {
   val clientSecret = "d57182bc22304585b6837788f73bdad1"
 
   def main(args: Array[String]): Unit = {
-    println(Spotify(ClientCredentials(clientID, clientSecret)).authObj)
+    println(Spotify(ClientCredentials(clientID, clientSecret)))
   }
 
 }

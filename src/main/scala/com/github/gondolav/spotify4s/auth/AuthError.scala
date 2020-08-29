@@ -1,4 +1,4 @@
-package com.github.gondola.spotify4s.auth
+package com.github.gondolav.spotify4s.auth
 
 import upickle.default._
 

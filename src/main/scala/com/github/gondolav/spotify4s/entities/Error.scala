@@ -1,4 +1,4 @@
-package com.github.gondola.spotify4s.entities
+package com.github.gondolav.spotify4s.entities
 
 import upickle.default._
 

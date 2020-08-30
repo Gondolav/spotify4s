@@ -2,6 +2,7 @@ package com.github.gondolav.spotify4s.entities
 
 import java.net.URI
 
+import ujson.{Null, Value}
 import upickle.default._
 
 case class ArtistJson(
@@ -19,6 +20,11 @@ case class ArtistJson(
 
 object ArtistJson {
   implicit val rw: ReadWriter[ArtistJson] = macroRW
+
+  implicit def OptionReader[T: Reader]: Reader[Option[T]] = reader[Value].map[Option[T]] {
+    case Null => None
+    case jsValue => Some(read[T](jsValue))
+  }
 }
 
 case class Artist(

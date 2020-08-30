@@ -2,12 +2,13 @@ package com.github.gondolav.spotify4s.entities
 
 import java.net.URI
 
+import ujson.{Null, Value}
 import upickle.default._
 
 case class TrackJson(
                       album: Option[AlbumJson] = None,
                       artists: List[ArtistJson],
-                      available_markets: List[String],
+                      available_markets: List[String] = Nil,
                       disc_number: Int,
                       duration_ms: Int,
                       explicit: Boolean,
@@ -29,12 +30,17 @@ case class TrackJson(
 
 object TrackJson {
   implicit val rw: ReadWriter[TrackJson] = macroRW
+
+  implicit def OptionReader[T: Reader]: Reader[Option[T]] = reader[Value].map[Option[T]] {
+    case Null => None
+    case jsValue => Some(read[T](jsValue))
+  }
 }
 
 case class Track(
                   album: Option[Album] = None,
                   artists: List[Artist],
-                  availableMarkets: List[String],
+                  availableMarkets: List[String] = Nil,
                   discNumber: Int,
                   durationMs: Int,
                   explicit: Boolean,

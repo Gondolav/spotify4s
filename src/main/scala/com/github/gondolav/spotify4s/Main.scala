@@ -12,7 +12,7 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     val s = Spotify(ClientCredentials(clientID, clientSecret))
-    println(s.getAlbums(List("41MnTivkwTO3UUJ8DrqEJJ", "6JWc4iAiJ9FjyK0B59ABb4", "6UXCm6bOO4gFlDQZV5yL37")))
+    println(s.getCategoryPlaylists("party", country = "BR", limit = 2))
   }
 
 }

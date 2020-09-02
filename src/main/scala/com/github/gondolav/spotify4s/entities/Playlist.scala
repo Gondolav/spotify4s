@@ -20,6 +20,7 @@ case class PlaylistJson(
                          `type`: String,
                          uri: String
                        )
+
 object PlaylistJson {
   implicit val rw: ReadWriter[PlaylistJson] = macroRW
 }
@@ -40,6 +41,7 @@ case class Playlist(
                      objectType: String,
                      uri: URI
                    )
+
 object Playlist {
   def fromJson(json: PlaylistJson): Playlist = Playlist(
     json.collaborative,
@@ -53,7 +55,7 @@ object Playlist {
     User.fromJson(json.owner),
     json.public,
     json.snapshot_id,
-    json.tracks.copy(items = json.tracks.items.map(PlaylistTrack.fromJson)),
+    json.tracks.copy(items = json.tracks.items.map(tracks => tracks.map(PlaylistTrack.fromJson))),
     json.`type`,
     URI.create(json.uri)
   )

@@ -1,9 +1,7 @@
 package com.github.gondolav.spotify4s
 
 import com.github.gondolav.spotify4s.auth.{AuthException, AuthFlow, AuthObj}
-
 import com.github.gondolav.spotify4s.entities._
-
 import requests.RequestFailedException
 import upickle.default._
 
@@ -88,6 +86,14 @@ class Spotify(authFlow: AuthFlow) {
     Right(read[Category](req.text))
   }
 
+  private def withErrorHandling[T](task: => Right[Nothing, T]): Either[Error, T] = {
+    try {
+      task
+    } catch {
+      case e: RequestFailedException => Left(read[Error](e.response.text))
+    }
+  }
+
   /**
    * Gets a list of Spotify playlists tagged with a particular category.
    *
@@ -149,12 +155,6 @@ class Spotify(authFlow: AuthFlow) {
     }
 
     Right(res)
-  }
-
-  private case class FeaturedPlaylistsAnswer(message: String, playlists: Paging[PlaylistJson])
-
-  private object FeaturedPlaylistsAnswer {
-    implicit val rw: ReadWriter[FeaturedPlaylistsAnswer] = macroRW
   }
 
   /**
@@ -226,21 +226,41 @@ class Spotify(authFlow: AuthFlow) {
   }
 
   /**
+   * Creates a playlist-style listening experience based on seed artists, tracks and genres. Recommendations are
+   * generated based on the available information for a given seed entity and matched against similar artists and
+   * tracks. If there is sufficient information about the provided seeds, a list of tracks will be returned together
+   * with pool size details. For artists and tracks that are very new or obscure there might not be enough data to
+   * generate a list of tracks.
    *
-   * @param limit
-   * @param market
-   * @param attributes
-   * @param seedArtists
-   * @param seedGenres
-   * @param seedTracks
-   * @return
+   * N.B. at least one seed must be provided.
+   *
+   * @param limit       (optional) the target size of the list of recommended tracks. For seeds with unusually small
+   *                    pools or when highly restrictive filtering is applied, it may be impossible to generate the
+   *                    requested number of recommended tracks. Debugging information for such cases is available in
+   *                    the response. Default: 20. Minimum: 1. Maximum: 100
+   * @param market      (optional) an ISO 3166-1 alpha-2 country code or the string from_token. Provide this parameter
+   *                    if you want to apply Track Relinking. Because min_*, max_* and target_* are applied to pools
+   *                    before relinking, the generated results may not precisely match the filters applied. Original,
+   *                    non-relinked tracks are available via the linked_from attribute of the relinked track response
+   * @param attributes  (optional) a map containing tunable track attributes. Keys can start by either "max_", "min_"
+   *                    or "target_". See [[https://developer.spotify.com/documentation/web-api/reference/browse/get-recommendations/ the Spotify documentation]] for more details.
+   * @param seedArtists a comma separated list of Spotify IDs for seed artists. Up to 5 seed values may be provided in
+   *                    any combination of seed_artists, seed_tracks and seed_genres
+   * @param seedGenres a comma separated list of any genres in the set of available genre seeds. Up to 5 seed values
+   *                   may be provided in any combination of seed_artists, seed_tracks and seed_genres
+   * @param seedTracks a comma separated list of Spotify IDs for a seed track. Up to 5 seed values may be provided in
+   *                   any combination of seed_artists, seed_tracks and seed_genres
+   * @return a [[Recommendations]] on success, otherwise it returns [[Error]]
    */
-  def getRecommendations(limit: Int = 20, market: String = "", attributes: Map[String, Double] = Map.empty, seedArtists: List[String] = Nil, seedGenres: List[String] = Nil, seedTracks: List[String] = Nil): Either[Error, Recommendations] = withErrorHandling {
+  def getRecommendations(limit: Int = 20, market: String = "", attributes: Map[String, String] = Map.empty,
+                         seedArtists: List[String] = Nil, seedGenres: List[String] = Nil,
+                         seedTracks: List[String] = Nil): Either[Error, Recommendations] = withErrorHandling {
     require(1 <= limit && limit <= 100, "The limit parameter must be between 1 and 100")
+    require(!(seedArtists.isEmpty || seedGenres.isEmpty || seedTracks.isEmpty), "At least one seed must be provided")
 
     val req = requests.get(f"$endpoint/recommendations",
       headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
-      params = attributes.toList.map(attr => (attr._1, attr._2.toString))
+      params = attributes.toList.map { case (name, value) => (name, value) }
         ++ List(("limit", limit.toString))
         ++ (if (seedArtists.nonEmpty) List(("seed_artists", seedArtists.mkString(","))) else Nil)
         ++ (if (seedGenres.nonEmpty) List(("seed_genres", seedGenres.mkString(","))) else Nil)
@@ -248,14 +268,6 @@ class Spotify(authFlow: AuthFlow) {
         ++ (if (market.nonEmpty) List(("market", market)) else Nil))
 
     Right(Recommendations.fromJson(read[RecommendationsJson](req.text)))
-  }
-
-  private def withErrorHandling[T](task: => Right[Nothing, T]): Either[Error, T] = {
-    try {
-      task
-    } catch {
-      case e: RequestFailedException => Left(read[Error](e.response.text))
-    }
   }
 
   /**
@@ -350,6 +362,12 @@ class Spotify(authFlow: AuthFlow) {
 
     val res = read[Map[String, List[ArtistJson]]](req.text)
     Right(res("artists").map(Artist.fromJson))
+  }
+
+  private case class FeaturedPlaylistsAnswer(message: String, playlists: Paging[PlaylistJson])
+
+  private object FeaturedPlaylistsAnswer {
+    implicit val rw: ReadWriter[FeaturedPlaylistsAnswer] = macroRW
   }
 }
 

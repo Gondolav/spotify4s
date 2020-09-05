@@ -38,7 +38,7 @@ object AlbumJson {
 sealed trait AlbumType
 
 object AlbumType {
-  def fromString(s: String): AlbumType = s match {
+  def fromString(s: String): AlbumType = s.toLowerCase match {
     case "album" => AlbumT
     case "single" => Single
     case "compilation" => Compilation

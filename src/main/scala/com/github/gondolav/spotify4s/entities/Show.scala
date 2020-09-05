@@ -2,6 +2,7 @@ package com.github.gondolav.spotify4s.entities
 
 import java.net.URI
 
+import ujson.{Null, Value}
 import upickle.default._
 
 case class ShowJson(
@@ -25,6 +26,11 @@ case class ShowJson(
 
 object ShowJson {
   implicit val rw: ReadWriter[ShowJson] = macroRW
+
+  implicit def OptionReader[T: Reader]: Reader[Option[T]] = reader[Value].map[Option[T]] {
+    case Null => None
+    case jsValue => Some(read[T](jsValue))
+  }
 }
 
 case class Show(
@@ -47,22 +53,23 @@ case class Show(
                )
 
 object Show {
-  def fromJson(json: ShowJson): Show = Show(
-    json.available_markets,
-    json.copyrights.map(Copyright.fromJson),
-    json.description,
-    json.explicit,
-    json.episodes.map(eps => eps.copy(items = eps.items.map(episodes => episodes.map(Episode.fromJson)))),
-    json.external_urls,
-    json.href,
-    json.id,
-    json.images,
-    json.is_externally_hosted,
-    json.languages,
-    json.media_type,
-    json.name,
-    json.publisher,
-    json.`type`,
-    URI.create(json.uri)
-  )
+  def fromJson(json: ShowJson): Show = if (json == null) null else
+    Show(
+      json.available_markets,
+      json.copyrights.map(Copyright.fromJson),
+      json.description,
+      json.explicit,
+      json.episodes.map(eps => eps.copy(items = eps.items.map(episodes => episodes.map(Episode.fromJson)))),
+      json.external_urls,
+      json.href,
+      json.id,
+      json.images,
+      json.is_externally_hosted,
+      json.languages,
+      json.media_type,
+      json.name,
+      json.publisher,
+      json.`type`,
+      URI.create(json.uri)
+    )
 }

@@ -86,14 +86,6 @@ class Spotify(authFlow: AuthFlow) {
     Right(read[Category](req.text))
   }
 
-  private def withErrorHandling[T](task: => Right[Nothing, T]): Either[Error, T] = {
-    try {
-      task
-    } catch {
-      case e: RequestFailedException => Left(read[Error](e.response.text))
-    }
-  }
-
   /**
    * Gets a list of Spotify playlists tagged with a particular category.
    *
@@ -322,7 +314,7 @@ class Spotify(authFlow: AuthFlow) {
    * @param country an ISO 3166-1 alpha-2 country code or the string from_token.
    * @return a List of up to 10 [[Track]]s on success, otherwise it returns [[Error]]
    */
-  def getArtistTopTracks(id: String, country: String): Either[Error, List[Track]] = {
+  def getArtistTopTracks(id: String, country: String): Either[Error, List[Track]] = withErrorHandling {
     val req = requests.get(f"$endpoint/artists/$id/top-tracks",
       headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
       params = List(("country", country)))
@@ -337,11 +329,20 @@ class Spotify(authFlow: AuthFlow) {
    * @param id the Spotify ID for the artist
    * @return a List of up to 20 [[Artist]]s on success, otherwise it returns [[Error]]
    */
-  def getArtistRelatedArtists(id: String): Either[Error, List[Artist]] = {
-    val req = requests.get(f"$endpoint/artists/$id/related-artists", headers = List(("Authorization", f"Bearer ${authObj.accessToken}")))
+  def getArtistRelatedArtists(id: String): Either[Error, List[Artist]] = withErrorHandling {
+    val req = requests.get(f"$endpoint/artists/$id/related-artists",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")))
 
     val res = read[Map[String, List[ArtistJson]]](req.text)
     Right(res("artists").map(Artist.fromJson))
+  }
+
+  private def withErrorHandling[T](task: => Right[Nothing, T]): Either[Error, T] = {
+    try {
+      task
+    } catch {
+      case e: RequestFailedException => Left(read[Error](e.response.text))
+    }
   }
 
   /**
@@ -353,7 +354,7 @@ class Spotify(authFlow: AuthFlow) {
    * @param ids a list containing the Spotify IDs for the albums. Maximum: 50 IDs
    * @return a List of [[Artist]]s on success, otherwise it returns [[Error]]
    */
-  def getArtists(ids: List[String]): Either[Error, List[Artist]] = {
+  def getArtists(ids: List[String]): Either[Error, List[Artist]] = withErrorHandling {
     require(ids.length <= 50, "The maximum number of IDs is 50")
 
     val req = requests.get(f"$endpoint/artists",
@@ -368,6 +369,8 @@ class Spotify(authFlow: AuthFlow) {
    * Gets Spotify catalog information for a single episode identified by its unique Spotify ID.
    *
    * Reading the user’s resume points on episode objects requires the user-read-playback-position scope.
+   *
+   * If an episode is unavailable in the given market the HTTP status code in the response header is 404 NOT FOUND.
    *
    * @param id     the Spotify ID for the episode
    * @param market (optional) an ISO 3166-1 alpha-2 country code.
@@ -394,15 +397,15 @@ class Spotify(authFlow: AuthFlow) {
    * null value is returned in the appropriate position.
    *
    * @param ids    a comma-separated list of the Spotify IDs for the episodes. Maximum: 50 IDs
-   * @param market (optional) An ISO 3166-1 alpha-2 country code. If a country code is specified, only shows and
+   * @param market (optional) an ISO 3166-1 alpha-2 country code. If a country code is specified, only shows and
    *               episodes that are available in that market will be returned. If a valid user access token is
    *               specified in the request header, the country associated with the user account will take priority
    *               over this parameter. Note: If neither market or user country are provided, the content is
    *               considered unavailable for the client. Users can view the country that is associated with
-   *               their account in the account settings.
+   *               their account in the account settings
    * @return a List of [[Episode]]s on success, otherwise it returns [[Error]]
    */
-  def getEpisodes(ids: List[String], market: String = ""): Either[Error, List[Episode]] = {
+  def getEpisodes(ids: List[String], market: String = ""): Either[Error, List[Episode]] = withErrorHandling {
     require(ids.length <= 50, "The maximum number of IDs is 50")
 
     val req = requests.get(f"$endpoint/episodes",
@@ -411,6 +414,93 @@ class Spotify(authFlow: AuthFlow) {
 
     val res = read[Map[String, List[EpisodeJson]]](req.text)
     Right(res("episodes").map(Episode.fromJson))
+  }
+
+  /**
+   * Gets Spotify catalog information for a single show identified by its unique Spotify ID.
+   *
+   * Reading the user’s resume points on episode objects requires the user-read-playback-position scope.
+   *
+   * If a show is unavailable in the given market the HTTP status code in the response header is 404 NOT FOUND.
+   * Unavailable episodes are filtered out.
+   *
+   * @param id     the Spotify ID for the show.
+   * @param market (optional) an ISO 3166-1 alpha-2 country code. If a country code is specified, only shows and
+   *               episodes that are available in that market will be returned. If a valid user access token is
+   *               specified in the request header, the country associated with the user account will take priority
+   *               over this parameter. Note: If neither market or user country are provided, the content is
+   *               considered unavailable for the client. Users can view the country that is associated with their
+   *               account in the account settings
+   * @return a [[Show]] on success, otherwise it returns [[Error]]
+   */
+  def getShow(id: String, market: String = ""): Either[Error, Show] = withErrorHandling {
+    val req = requests.get(f"$endpoint/shows/$id",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = if (market.nonEmpty) List(("market", market)) else Nil)
+
+    val res = read[ShowJson](req.text)
+    Right(Show.fromJson(res))
+  }
+
+  /**
+   * Gets Spotify catalog information for multiple shows based on their Spotify IDs.
+   *
+   * Reading the user’s resume points on episode objects requires the user-read-playback-position scope.
+   *
+   * Objects are returned in the order requested. If an object is not found or unavailable in the given market, a null
+   * value is returned in the appropriate position.
+   *
+   * @param ids    a comma-separated list of the Spotify IDs for the shows. Maximum: 50 IDs
+   * @param market (optional) an ISO 3166-1 alpha-2 country code. If a country code is specified, only shows and
+   *               episodes that are available in that market will be returned. If a valid user access token is
+   *               specified in the request header, the country associated with the user account will take priority
+   *               over this parameter. Note: If neither market or user country are provided, the content is considered
+   *               unavailable for the client. Users can view the country that is associated with their account in the account settings.
+   * @return a List of [[Show]]s on success, otherwise it returns [[Error]]
+   */
+  def getShows(ids: List[String], market: String = ""): Either[Error, List[Show]] = withErrorHandling {
+    require(ids.length <= 50, "The maximum number of IDs is 50")
+
+    val req = requests.get(f"$endpoint/shows",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("ids", ids.mkString(","))) ++ (if (market.nonEmpty) List(("market", market)) else Nil))
+
+    val res = read[Map[String, List[ShowJson]]](req.text)
+    Right(res("shows").map(Show.fromJson))
+  }
+
+  /**
+   * Gets Spotify catalog information about a show’s episodes. Optional parameters can be used to limit the number of
+   * episodes returned.
+   *
+   * Reading the user’s resume points on episode objects requires the user-read-playback-position scope.
+   *
+   * If a show is unavailable in the given market the HTTP status code in the response header is 404 NOT FOUND.
+   * Unavailable episodes are filtered out.
+   *
+   * @param id     the Spotify ID for the show
+   * @param market (optional) an ISO 3166-1 alpha-2 country code. If a country code is specified, only shows and
+   *               episodes that are available in that market will be returned. If a valid user access token is
+   *               specified in the request header, the country associated with the user account will take priority
+   *               over this parameter. Note: If neither market or user country are provided, the content is
+   *               considered unavailable for the client. Users can view the country that is associated with their
+   *               account in the account settings
+   * @param limit  (optional) the maximum number of episodes to return. Default: 20. Minimum: 1. Maximum: 50
+   * @param offset (optional) the index of the first episode to return. Default: 0 (the first object). Use with limit
+   *               to get the next set of episodes
+   * @return a [[Paging]] object wrapping [[Episode]]s on success, otherwise it returns [[Error]]
+   */
+  def getShowEpisodes(id: String, market: String = "", limit: Int = 20, offset: Int = 0): Either[Error, Paging[Episode]] = withErrorHandling {
+    require(1 <= limit && limit <= 50, "The limit parameter must be between 1 and 50")
+    require(offset >= 0, "The offset parameter must be non-negative")
+
+    val req = requests.get(f"$endpoint/shows/$id/episodes",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("limit", limit.toString), ("offset", offset.toString)) ++
+        (if (market.nonEmpty) List(("market", market)) else Nil))
+
+    val res = read[Paging[EpisodeJson]](req.text)
+    Right(res.copy(items = res.items.map(episodes => episodes.map(Episode.fromJson))))
   }
 
   private case class FeaturedPlaylistsAnswer(message: String, playlists: Paging[PlaylistJson])

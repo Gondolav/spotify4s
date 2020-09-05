@@ -51,22 +51,6 @@ case object Single extends AlbumType
 
 case object Compilation extends AlbumType
 
-sealed trait ReleaseDatePrecision
-
-object ReleaseDatePrecision {
-  def fromString(s: String): ReleaseDatePrecision = s match {
-    case "year" => Year
-    case "month" => Month
-    case "day" => Day
-  }
-}
-
-case object Year extends ReleaseDatePrecision
-
-case object Month extends ReleaseDatePrecision
-
-case object Day extends ReleaseDatePrecision
-
 case class Album(albumGroup: Option[String] = None,
                  albumType: AlbumType,
                  artists: List[Artist],

@@ -246,10 +246,10 @@ class Spotify(authFlow: AuthFlow) {
    *                    or "target_". See [[https://developer.spotify.com/documentation/web-api/reference/browse/get-recommendations/ the Spotify documentation]] for more details.
    * @param seedArtists a comma separated list of Spotify IDs for seed artists. Up to 5 seed values may be provided in
    *                    any combination of seed_artists, seed_tracks and seed_genres
-   * @param seedGenres a comma separated list of any genres in the set of available genre seeds. Up to 5 seed values
-   *                   may be provided in any combination of seed_artists, seed_tracks and seed_genres
-   * @param seedTracks a comma separated list of Spotify IDs for a seed track. Up to 5 seed values may be provided in
-   *                   any combination of seed_artists, seed_tracks and seed_genres
+   * @param seedGenres  a comma separated list of any genres in the set of available genre seeds. Up to 5 seed values
+   *                    may be provided in any combination of seed_artists, seed_tracks and seed_genres
+   * @param seedTracks  a comma separated list of Spotify IDs for a seed track. Up to 5 seed values may be provided in
+   *                    any combination of seed_artists, seed_tracks and seed_genres
    * @return a [[Recommendations]] on success, otherwise it returns [[Error]]
    */
   def getRecommendations(limit: Int = 20, market: String = "", attributes: Map[String, String] = Map.empty,
@@ -364,11 +364,61 @@ class Spotify(authFlow: AuthFlow) {
     Right(res("artists").map(Artist.fromJson))
   }
 
+  /**
+   * Gets Spotify catalog information for a single episode identified by its unique Spotify ID.
+   *
+   * Reading the user’s resume points on episode objects requires the user-read-playback-position scope.
+   *
+   * @param id     the Spotify ID for the episode
+   * @param market (optional) an ISO 3166-1 alpha-2 country code.
+   *               If a country code is specified, only shows and episodes that are available in that market
+   *               will be returned. If a valid user access token is specified in the request header, the country
+   *               associated with the user account will take priority over this parameter. Note: If neither market or
+   *               user country are provided, the content is considered unavailable for the client.
+   *               Users can view the country that is associated with their account in the account settings
+   * @return an [[Episode]] on success, otherwise it returns [[Error]]
+   */
+  def getEpisode(id: String, market: String = ""): Either[Error, Episode] = withErrorHandling {
+    val req = requests.get(f"$endpoint/episodes/$id",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = if (market.nonEmpty) List(("market", market)) else Nil)
+
+    val res = read[EpisodeJson](req.text)
+    Right(Episode.fromJson(res))
+  }
+
+  /**
+   * Gets Spotify catalog information for multiple episodes based on their Spotify IDs.
+   *
+   * Objects are returned in the order requested. If an object is not found or unavailable in the given market, a
+   * null value is returned in the appropriate position.
+   *
+   * @param ids    a comma-separated list of the Spotify IDs for the episodes. Maximum: 50 IDs
+   * @param market (optional) An ISO 3166-1 alpha-2 country code. If a country code is specified, only shows and
+   *               episodes that are available in that market will be returned. If a valid user access token is
+   *               specified in the request header, the country associated with the user account will take priority
+   *               over this parameter. Note: If neither market or user country are provided, the content is
+   *               considered unavailable for the client. Users can view the country that is associated with
+   *               their account in the account settings.
+   * @return a List of [[Episode]]s on success, otherwise it returns [[Error]]
+   */
+  def getEpisodes(ids: List[String], market: String = ""): Either[Error, List[Episode]] = {
+    require(ids.length <= 50, "The maximum number of IDs is 50")
+
+    val req = requests.get(f"$endpoint/episodes",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("ids", ids.mkString(","))))
+
+    val res = read[Map[String, List[EpisodeJson]]](req.text)
+    Right(res("episodes").map(Episode.fromJson))
+  }
+
   private case class FeaturedPlaylistsAnswer(message: String, playlists: Paging[PlaylistJson])
 
-  private object FeaturedPlaylistsAnswer {
+  private object FeaturedPlaylistsAnswer { // actually used
     implicit val rw: ReadWriter[FeaturedPlaylistsAnswer] = macroRW
   }
+
 }
 
 object Spotify {

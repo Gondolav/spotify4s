@@ -9,7 +9,7 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     val s = Spotify(ClientCredentials(clientID, clientSecret))
-    println(s.getShowEpisodes("38bS44xjbVVZ3No3ByF1dJ", offset = 1, limit = 2, market = "SE"))
+    println(s.getTrack("11dFghVXANMlKmJXsNCbNl"))
   }
 
 }

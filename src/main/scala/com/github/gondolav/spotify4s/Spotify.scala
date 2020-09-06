@@ -337,14 +337,6 @@ class Spotify(authFlow: AuthFlow) {
     Right(res("artists").map(Artist.fromJson))
   }
 
-  private def withErrorHandling[T](task: => Right[Nothing, T]): Either[Error, T] = {
-    try {
-      task
-    } catch {
-      case e: RequestFailedException => Left(read[Error](e.response.text))
-    }
-  }
-
   /**
    * Gets Spotify catalog information for several artists based on their Spotify IDs.
    *
@@ -363,6 +355,14 @@ class Spotify(authFlow: AuthFlow) {
 
     val res = read[Map[String, List[ArtistJson]]](req.text)
     Right(res("artists").map(Artist.fromJson))
+  }
+
+  private def withErrorHandling[T](task: => Right[Nothing, T]): Either[Error, T] = {
+    try {
+      task
+    } catch {
+      case e: RequestFailedException => Left(read[Error](e.response.text))
+    }
   }
 
   /**
@@ -501,6 +501,102 @@ class Spotify(authFlow: AuthFlow) {
 
     val res = read[Paging[EpisodeJson]](req.text)
     Right(res.copy(items = res.items.map(episodes => episodes.map(Episode.fromJson))))
+  }
+
+  /**
+   * Gets a detailed audio analysis for a single track identified by its unique Spotify ID.
+   *
+   * The Audio Analysis endpoint provides low-level audio analysis for all of the tracks in the Spotify catalog.
+   * The Audio Analysis describes the track’s structure and musical content, including rhythm, pitch, and timbre.
+   * All information is precise to the audio sample.
+   *
+   * Many elements of analysis include confidence values, a floating-point number ranging from 0.0 to 1.0.
+   * Confidence indicates the reliability of its corresponding attribute. Elements carrying a small confidence value
+   * should be considered speculative. There may not be sufficient data in the audio to compute the attribute with
+   * high certainty.
+   *
+   * @param id the Spotify ID for the track
+   * @return an [[AudioAnalysis]] on success, otherwise it returns [[Error]]
+   */
+  def getTrackAudioAnalysis(id: String): Either[Error, AudioAnalysis] = withErrorHandling {
+    val req = requests.get(f"$endpoint/audio-analysis/$id",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")))
+
+    val res = read[AudioAnalysisJson](req.text)
+    Right(AudioAnalysis.fromJson(res))
+  }
+
+  /**
+   * Gets audio feature information for a single track identified by its unique Spotify ID.
+   *
+   * @param id the Spotify ID for the track
+   * @return an [[AudioFeatures]] on success, otherwise it returns [[Error]]
+   */
+  def getTrackAudioFeatures(id: String): Either[Error, AudioFeatures] = withErrorHandling {
+    val req = requests.get(f"$endpoint/audio-features/$id",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")))
+
+    val res = read[AudioFeaturesJson](req.text)
+    Right(AudioFeatures.fromJson(res))
+  }
+
+  /**
+   * Gets audio features for multiple tracks based on their Spotify IDs.
+   *
+   * Objects are returned in the order requested. If an object is not found, a null value is returned in the
+   * appropriate position. Duplicate ids in the query will result in duplicate objects in the response.
+   *
+   * @param ids a comma-separated list of the Spotify IDs for the tracks. Maximum: 100 IDs
+   * @return a List of [[AudioFeatures]] on success, otherwise it returns [[Error]]
+   */
+  def getTracksAudioFeatures(ids: List[String]): Either[Error, List[AudioFeatures]] = withErrorHandling {
+    require(ids.length <= 100, "The maximum number of IDs is 100")
+
+    val req = requests.get(f"$endpoint/audio-features",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("ids", ids.mkString(","))))
+
+    val res = read[Map[String, List[AudioFeaturesJson]]](req.text)
+    Right(res("audio_features").map(AudioFeatures.fromJson))
+  }
+
+  /**
+   * Gets Spotify catalog information for multiple tracks based on their Spotify IDs.
+   *
+   * Objects are returned in the order requested. If an object is not found, a null value is returned in the
+   * appropriate position. Duplicate ids in the query will result in duplicate objects in the response.
+   *
+   * @param ids    a comma-separated list of the Spotify IDs for the tracks. Maximum: 50 IDs
+   * @param market (optional) an ISO 3166-1 alpha-2 country code or the string from_token. Provide this parameter if
+   *               you want to apply Track Relinking
+   * @return a List of [[Track]] on success, otherwise it returns [[Error]]
+   */
+  def getTracks(ids: List[String], market: String = ""): Either[Error, List[Track]] = withErrorHandling {
+    require(ids.length <= 50, "The maximum number of IDs is 50")
+
+    val req = requests.get(f"$endpoint/tracks",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("ids", ids.mkString(","))) ++ (if (market.nonEmpty) List(("market", market)) else Nil))
+
+    val res = read[Map[String, List[TrackJson]]](req.text)
+    Right(res("tracks").map(Track.fromJson))
+  }
+
+  /**
+   * Gets Spotify catalog information for a single track identified by its unique Spotify ID.
+   *
+   * @param id     the Spotify ID for the track
+   * @param market (optional) an ISO 3166-1 alpha-2 country code or the string from_token. Provide this parameter if
+   *               you want to apply Track Relinking
+   * @return a [[Track]] on success, otherwise it returns [[Error]]
+   */
+  def getTrack(id: String, market: String = ""): Either[Error, Track] = withErrorHandling {
+    val req = requests.get(f"$endpoint/tracks/$id",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = if (market.nonEmpty) List(("market", market)) else Nil)
+
+    val res = read[TrackJson](req.text)
+    Right(Track.fromJson(res))
   }
 
   private case class FeaturedPlaylistsAnswer(message: String, playlists: Paging[PlaylistJson])

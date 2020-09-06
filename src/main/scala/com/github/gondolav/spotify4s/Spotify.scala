@@ -5,6 +5,10 @@ import com.github.gondolav.spotify4s.entities._
 import requests.RequestFailedException
 import upickle.default._
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
+
 class Spotify(authFlow: AuthFlow) {
   val authObj: AuthObj = authFlow.authenticate match {
     case Left(error) => throw new AuthException(f"An error occurred while authenticating: '${error.errorDescription}'\n", error)
@@ -43,6 +47,14 @@ class Spotify(authFlow: AuthFlow) {
 
     val res = read[Paging[TrackJson]](req.text)
     Right(res.copy(items = res.items.map(tracks => tracks.map(Track.fromJson))))
+  }
+
+  private def withErrorHandling[T](task: => Right[Nothing, T]): Either[Error, T] = {
+    try {
+      task
+    } catch {
+      case e: RequestFailedException => Left(read[Error](e.response.text))
+    }
   }
 
   /**
@@ -110,14 +122,6 @@ class Spotify(authFlow: AuthFlow) {
     }
 
     Right(res.copy(items = res.items.map(playlists => playlists.map(Playlist.fromJson))))
-  }
-
-  private def withErrorHandling[T](task: => Right[Nothing, T]): Either[Error, T] = {
-    try {
-      task
-    } catch {
-      case e: RequestFailedException => Left(read[Error](e.response.text))
-    }
   }
 
   /**
@@ -599,41 +603,88 @@ class Spotify(authFlow: AuthFlow) {
     Right(Track.fromJson(res))
   }
 
-//  def search[T <: Searchable](q: String, objectTypes: List[ObjectType], market: String = "", limit: Int = 20, offset: Int = 0,
-//                              includeExternal: String = ""): Either[Error, List[Paging[T]]] = withErrorHandling {
-//    require(q.nonEmpty, "The q parameter must be non-empty")
-//    require(objectTypes.nonEmpty, "The objectTypes parameter must be non-empty")
-//    require(1 <= limit && limit <= 50, "The limit parameter must be between 1 and 50")
-//    require(0 <= offset && offset <= 2000, "The offset parameter must be between 0 and 2000")
-//
-//    val req = requests.get(f"$endpoint/search",
-//      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
-//      params = List(("limit", limit.toString), ("offset", offset.toString), ("q", q), ("type",
-//        objectTypes.map(s => s.toString.toLowerCase).mkString(",")))
-//        ++ (if (market.nonEmpty) List(("market", market)) else Nil)
-//        ++ (if (includeExternal.nonEmpty) List(("include_external", includeExternal)) else Nil))
-//
-//    val res = read[Map[String, Paging[Searchable]]](req.text)
-//    Right(res.map {
-//      case (objType, paging) => objType match {
-//        case "artists" => paging.copy(items = paging.items.map(artists => artists.map {
-//          case artist: ArtistJson => Artist.fromJson(artist).asInstanceOf[T]
-//        }))
-//        case "albums" => paging.copy(items = paging.items.map(albums => albums.map {
-//          case album: AlbumJson => Album.fromJson(album).asInstanceOf[T]
-//        }))
-//        case "tracks" => paging.copy(items = paging.items.map(tracks => tracks.map {
-//          case track: TrackJson => Track.fromJson(track).asInstanceOf[T]
-//        }))
-//        case "shows" => paging.copy(items = paging.items.map(shows => shows.map {
-//          case show: ShowJson => Show.fromJson(show).asInstanceOf[T]
-//        }))
-//        case "episodes" => paging.copy(items = paging.items.map(episodes => episodes.map {
-//          case episode: EpisodeJson => Episode.fromJson(episode).asInstanceOf[T]
-//        }))
-//      }
-//    }.toList)
-//  }
+  /**
+   * Gets Spotify Catalog information about albums, artists, playlists, tracks, shows or episodes that match a
+   * keyword string.
+   *
+   * @param q               search query keywords and optional field filters and operators.
+   *
+   *                        For example: roadhouse+blues.
+   * @param objectTypes     a  list of [[ObjectType]] to search across.
+   *                        Valid types are: [[AlbumObj]], [[ArtistObj]], [[TrackObj]], [[ShowObj]] and [[EpisodeObj]].
+   *
+   *                        Search results include hits from all the specified item types
+   * @param market          (optional) an ISO 3166-1 alpha-2 country code or the string from_token.
+   *                        If a country code is specified, only artists, albums, and tracks with content that is playable in
+   *                        that market is returned.
+   *
+   *                        Note:
+   *               - Playlist results are not affected by the market parameter.
+   *               - If market is set to from_token, and a valid access token is specified in the request header,
+   *                 only content playable in the country associated with the user account, is returned.
+   *               - Users can view the country that is associated with their account in the account settings. A user
+   *                 must grant access to the user-read-private scope prior to when the access token is issued
+   * @param limit           (optional) maximum number of results to return.
+   *                        Default: 20
+   *                        Minimum: 1
+   *                        Maximum: 50
+   *
+   *                        Note: The limit is applied within each type, not on the total response
+   * @param offset          (optional) the index of the first result to return.
+   *                        Default: 0 (the first result).
+   *                        Maximum offset (including limit): 2,000.
+   *
+   *                        Use with limit to get the next page of search results
+   * @param includeExternal (optional) possible values: audio
+   *
+   *                        If include_external=audio is specified the response will include any relevant audio content
+   *                        that is hosted externally. By default external content is filtered out from responses
+   * @return a List of [[Paging]] objects wrapping [[Searchable]]s on success, otherwise it returns [[Error]].
+   *         [[Album]], [[Artist]], [[Episode]], [[Show]] and [[Track]] are searchable.
+   */
+  def search(q: String, objectTypes: List[ObjectType], market: String = "", limit: Int = 20, offset: Int = 0,
+             includeExternal: String = ""): Either[Error, List[Paging[Searchable]]] = withErrorHandling {
+    def requestObjectType(objectType: ObjectType): Paging[Searchable] = {
+      val req = requests.get(f"$endpoint/search",
+        headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+        params = List(("limit", limit.toString), ("offset", offset.toString), ("q", q.replace("%20", "+")), ("type", objectType.toString))
+          ++ (if (market.nonEmpty) List(("market", market)) else Nil)
+          ++ (if (includeExternal.nonEmpty) List(("include_external", includeExternal)) else Nil))
+
+      objectType match {
+        case AlbumObj =>
+          val json = read[Map[String, Paging[AlbumJson]]](req.text)
+          val res = json("albums")
+          res.copy(items = res.items.map(albums => albums.map(Album.fromJson)))
+        case ArtistObj =>
+          val json = read[Map[String, Paging[ArtistJson]]](req.text)
+          val res = json("artists")
+          res.copy(items = res.items.map(artists => artists.map(Artist.fromJson)))
+        case EpisodeObj =>
+          val json = read[Map[String, Paging[EpisodeJson]]](req.text)
+          val res = json("episodes")
+          res.copy(items = res.items.map(episodes => episodes.map(Episode.fromJson)))
+        case ShowObj =>
+          val json = read[Map[String, Paging[ShowJson]]](req.text)
+          val res = json("shows")
+          res.copy(items = res.items.map(shows => shows.map(Show.fromJson)))
+        case TrackObj =>
+          val json = read[Map[String, Paging[TrackJson]]](req.text)
+          val res = json("tracks")
+          res.copy(items = res.items.map(tracks => tracks.map(Track.fromJson)))
+      }
+    }
+
+    require(q.nonEmpty, "The q parameter must be non-empty")
+    require(objectTypes.nonEmpty, "The objectTypes parameter must be non-empty")
+    require(1 <= limit && limit <= 50, "The limit parameter must be between 1 and 50")
+    require(0 <= offset && offset <= 2000, "The offset parameter must be between 0 and 2000")
+
+    val pagings = objectTypes.map(obj => Future {
+      requestObjectType(obj)
+    }).map(fut => Await.result(fut, Duration.Inf))
+    Right(pagings)
+  }
 
   private case class FeaturedPlaylistsAnswer(message: String, playlists: Paging[PlaylistJson])
 

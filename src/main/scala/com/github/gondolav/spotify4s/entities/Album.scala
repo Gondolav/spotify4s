@@ -70,7 +70,7 @@ case class Album(albumGroup: Option[String] = None,
                  restrictions: Option[Restrictions] = None,
                  tracks: Option[Paging[Track]] = None,
                  objectType: ObjectType = AlbumObj,
-                 uri: URI)
+                 uri: URI) extends Searchable
 
 object Album {
   def fromJson(json: AlbumJson): Album =

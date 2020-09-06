@@ -58,7 +58,7 @@ case class Track(
                   objectType: ObjectType = TrackObj,
                   uri: URI,
                   isLocal: Boolean
-                )
+                ) extends Searchable
 
 object Track {
   def fromJson(json: TrackJson): Track = Track(

@@ -38,7 +38,7 @@ case class Artist(
                    popularity: Option[Int],
                    objectType: ObjectType = ArtistObj,
                    uri: URI
-                 )
+                 ) extends Searchable
 
 object Artist {
   def fromJson(json: ArtistJson): Artist = Artist(

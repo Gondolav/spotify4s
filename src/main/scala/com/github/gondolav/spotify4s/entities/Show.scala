@@ -50,7 +50,7 @@ case class Show(
                  publisher: String,
                  objectType: ObjectType = ShowObj,
                  uri: URI
-               )
+               ) extends Searchable
 
 object Show {
   def fromJson(json: ShowJson): Show = if (json == null) null else

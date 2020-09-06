@@ -54,7 +54,7 @@ case class Episode(
                     show: Option[Show] = None,
                     objectType: ObjectType = EpisodeObj,
                     uri: URI
-                  )
+                  ) extends Searchable
 
 object Episode {
   def fromJson(json: EpisodeJson): Episode = if (json == null) null else

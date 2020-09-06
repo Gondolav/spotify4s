@@ -52,7 +52,7 @@ case class Episode(
                     releaseDatePrecision: ReleaseDatePrecision,
                     resumePoint: Option[ResumePoint] = None,
                     show: Option[Show] = None,
-                    objectType: String,
+                    objectType: ObjectType = EpisodeObj,
                     uri: URI
                   )
 
@@ -75,7 +75,7 @@ object Episode {
       ReleaseDatePrecision.fromString(json.release_date_precision),
       json.resume_point.map(ResumePoint.fromJson),
       json.show.map(Show.fromJson),
-      json.`type`,
+      ObjectType.fromString(json.`type`),
       URI.create(json.uri)
     )
 }

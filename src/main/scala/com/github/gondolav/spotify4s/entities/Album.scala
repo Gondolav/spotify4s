@@ -69,7 +69,7 @@ case class Album(albumGroup: Option[String] = None,
                  releaseDatePrecision: ReleaseDatePrecision,
                  restrictions: Option[Restrictions] = None,
                  tracks: Option[Paging[Track]] = None,
-                 objectType: String,
+                 objectType: ObjectType = AlbumObj,
                  uri: URI)
 
 object Album {
@@ -93,6 +93,6 @@ object Album {
       ReleaseDatePrecision.fromString(json.release_date_precision),
       json.restrictions,
       json.tracks.map(tracks => tracks.copy(items = tracks.items.map(tracks => tracks.map(Track.fromJson)))),
-      json.`type`,
+      ObjectType.fromString(json.`type`),
       URI.create(json.uri))
 }

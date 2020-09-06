@@ -9,7 +9,8 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     val s = Spotify(ClientCredentials(clientID, clientSecret))
-    println(s.getTrack("11dFghVXANMlKmJXsNCbNl"))
+    println(s.authObj.accessToken)
+//    println(s.search(q = "tania%20bowra", objectTypes = List(ArtistObj)))
   }
 
 }

@@ -55,7 +55,7 @@ case class Track(
                   popularity: Option[Int] = None,
                   previewUrl: String,
                   trackNumber: Int,
-                  objectType: String,
+                  objectType: ObjectType = TrackObj,
                   uri: URI,
                   isLocal: Boolean
                 )
@@ -79,7 +79,7 @@ object Track {
     json.popularity,
     json.preview_url,
     json.track_number,
-    json.`type`,
+    ObjectType.fromString(json.`type`),
     URI.create(json.uri),
     json.is_local
   )

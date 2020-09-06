@@ -36,7 +36,7 @@ case class Artist(
                    images: Option[List[Image]],
                    name: String,
                    popularity: Option[Int],
-                   objectType: String,
+                   objectType: ObjectType = ArtistObj,
                    uri: URI
                  )
 
@@ -50,7 +50,7 @@ object Artist {
     json.images,
     json.name,
     json.popularity,
-    json.`type`,
+    ObjectType.fromString(json.`type`),
     URI.create(json.uri)
   )
 }

@@ -112,6 +112,14 @@ class Spotify(authFlow: AuthFlow) {
     Right(res.copy(items = res.items.map(playlists => playlists.map(Playlist.fromJson))))
   }
 
+  private def withErrorHandling[T](task: => Right[Nothing, T]): Either[Error, T] = {
+    try {
+      task
+    } catch {
+      case e: RequestFailedException => Left(read[Error](e.response.text))
+    }
+  }
+
   /**
    * Gets a list of categories used to tag items in Spotify (on, for example, the Spotify player’s “Browse” tab).
    *
@@ -357,14 +365,6 @@ class Spotify(authFlow: AuthFlow) {
     Right(res("artists").map(Artist.fromJson))
   }
 
-  private def withErrorHandling[T](task: => Right[Nothing, T]): Either[Error, T] = {
-    try {
-      task
-    } catch {
-      case e: RequestFailedException => Left(read[Error](e.response.text))
-    }
-  }
-
   /**
    * Gets Spotify catalog information for a single episode identified by its unique Spotify ID.
    *
@@ -598,6 +598,42 @@ class Spotify(authFlow: AuthFlow) {
     val res = read[TrackJson](req.text)
     Right(Track.fromJson(res))
   }
+
+//  def search[T <: Searchable](q: String, objectTypes: List[ObjectType], market: String = "", limit: Int = 20, offset: Int = 0,
+//                              includeExternal: String = ""): Either[Error, List[Paging[T]]] = withErrorHandling {
+//    require(q.nonEmpty, "The q parameter must be non-empty")
+//    require(objectTypes.nonEmpty, "The objectTypes parameter must be non-empty")
+//    require(1 <= limit && limit <= 50, "The limit parameter must be between 1 and 50")
+//    require(0 <= offset && offset <= 2000, "The offset parameter must be between 0 and 2000")
+//
+//    val req = requests.get(f"$endpoint/search",
+//      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+//      params = List(("limit", limit.toString), ("offset", offset.toString), ("q", q), ("type",
+//        objectTypes.map(s => s.toString.toLowerCase).mkString(",")))
+//        ++ (if (market.nonEmpty) List(("market", market)) else Nil)
+//        ++ (if (includeExternal.nonEmpty) List(("include_external", includeExternal)) else Nil))
+//
+//    val res = read[Map[String, Paging[Searchable]]](req.text)
+//    Right(res.map {
+//      case (objType, paging) => objType match {
+//        case "artists" => paging.copy(items = paging.items.map(artists => artists.map {
+//          case artist: ArtistJson => Artist.fromJson(artist).asInstanceOf[T]
+//        }))
+//        case "albums" => paging.copy(items = paging.items.map(albums => albums.map {
+//          case album: AlbumJson => Album.fromJson(album).asInstanceOf[T]
+//        }))
+//        case "tracks" => paging.copy(items = paging.items.map(tracks => tracks.map {
+//          case track: TrackJson => Track.fromJson(track).asInstanceOf[T]
+//        }))
+//        case "shows" => paging.copy(items = paging.items.map(shows => shows.map {
+//          case show: ShowJson => Show.fromJson(show).asInstanceOf[T]
+//        }))
+//        case "episodes" => paging.copy(items = paging.items.map(episodes => episodes.map {
+//          case episode: EpisodeJson => Episode.fromJson(episode).asInstanceOf[T]
+//        }))
+//      }
+//    }.toList)
+//  }
 
   private case class FeaturedPlaylistsAnswer(message: String, playlists: Paging[PlaylistJson])
 

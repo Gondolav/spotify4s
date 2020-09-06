@@ -48,7 +48,7 @@ case class Show(
                  mediaType: String,
                  name: String,
                  publisher: String,
-                 objectType: String,
+                 objectType: ObjectType = ShowObj,
                  uri: URI
                )
 
@@ -69,7 +69,7 @@ object Show {
       json.media_type,
       json.name,
       json.publisher,
-      json.`type`,
+      ObjectType.fromString(json.`type`),
       URI.create(json.uri)
     )
 }

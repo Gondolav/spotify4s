@@ -1,6 +1,8 @@
 package com.github.gondolav.spotify4s
 
-import com.github.gondolav.spotify4s.auth.{AuthException, AuthFlow, AuthObj}
+import java.net.URI
+
+import com.github.gondolav.spotify4s.auth._
 import com.github.gondolav.spotify4s.entities._
 import requests.RequestFailedException
 import upickle.default._
@@ -10,11 +12,29 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 
 class Spotify(authFlow: AuthFlow) {
-  val authObj: AuthObj = authFlow.authenticate match {
+
+  private val endpoint = "https://api.spotify.com/v1"
+
+  var authObj: AuthObj = authFlow.authenticate match {
     case Left(error) => throw new AuthException(f"An error occurred while authenticating: '${error.errorDescription}'\n", error)
     case Right(value) => value
   }
-  private val endpoint = "https://api.spotify.com/v1"
+
+  def this(clientID: String, clientSecret: String) = this(ClientCredentials(clientID, clientSecret))
+
+  def this(clientID: String, clientSecret: String, redirectURI: URI, scopes: List[String] = Nil, withPKCE: Boolean = false) =
+    this(if (withPKCE) AuthCodeWithPKCE(clientID, clientSecret, redirectURI, scopes) else AuthCode(clientID, clientSecret, redirectURI, scopes))
+
+  /**
+   * Requests refreshed tokens, updating the field [[authObj]]. No additional action is required by the user.
+   *
+   * Access tokens are deliberately set to expire after a short time, after which new tokens may be granted by
+   * supplying the refresh token originally obtained during the authorization code exchange.
+   */
+  def requestRefreshedToken(): Unit = authFlow.requestRefreshedToken(authObj.refreshToken) match {
+    case Left(error) => throw new AuthException(f"An error occurred while refreshing the token: '${error.errorDescription}'\n", error)
+    case Right(value) => authObj = value
+  }
 
   /**
    * Gets Spotify catalog information for a single album.
@@ -47,14 +67,6 @@ class Spotify(authFlow: AuthFlow) {
 
     val res = read[Paging[TrackJson]](req.text)
     Right(res.copy(items = res.items.map(tracks => tracks.map(Track.fromJson))))
-  }
-
-  private def withErrorHandling[T](task: => Right[Nothing, T]): Either[Error, T] = {
-    try {
-      task
-    } catch {
-      case e: RequestFailedException => Left(read[Error](e.response.text))
-    }
   }
 
   /**
@@ -586,6 +598,14 @@ class Spotify(authFlow: AuthFlow) {
     Right(res("tracks").map(Track.fromJson))
   }
 
+  private def withErrorHandling[T](task: => Right[Nothing, T]): Either[Error, T] = {
+    try {
+      task
+    } catch {
+      case e: RequestFailedException => Left(read[Error](e.response.text))
+    }
+  }
+
   /**
    * Gets Spotify catalog information for a single track identified by its unique Spotify ID.
    *
@@ -696,6 +716,11 @@ class Spotify(authFlow: AuthFlow) {
 
 object Spotify {
   def apply(authFlow: AuthFlow): Spotify = new Spotify(authFlow)
+
+  def apply(clientID: String, clientSecret: String): Spotify = new Spotify(clientID, clientSecret)
+
+  def apply(clientID: String, clientSecret: String, redirectURI: URI, scopes: List[String] = Nil, withPKCE: Boolean = false): Spotify =
+    new Spotify(clientID, clientSecret, redirectURI, scopes, withPKCE)
 }
 
 

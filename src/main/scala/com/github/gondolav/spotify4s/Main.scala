@@ -1,6 +1,7 @@
 package com.github.gondolav.spotify4s
 
-import com.github.gondolav.spotify4s.auth.ClientCredentials
+import java.net.URI
+
 import com.github.gondolav.spotify4s.entities.{AlbumObj, ArtistObj}
 
 object Main {
@@ -9,8 +10,8 @@ object Main {
   val clientSecret = "d57182bc22304585b6837788f73bdad1"
 
   def main(args: Array[String]): Unit = {
-    val s = Spotify(ClientCredentials(clientID, clientSecret))
-    println(s.search(q = "tania+bowra", objectTypes = List(ArtistObj, AlbumObj)))
+    val s = Spotify(clientID, clientSecret, URI.create("http://localhost"), List("user-read-private"))
+    println(s.search(q = "ghali", objectTypes = List(ArtistObj)))
   }
 
 }

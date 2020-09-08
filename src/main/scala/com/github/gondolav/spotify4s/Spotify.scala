@@ -774,14 +774,6 @@ class Spotify(authFlow: AuthFlow) {
     else Right(())
   }
 
-  private def withErrorHandling[T](task: => Either[Error, T]): Either[Error, T] = {
-    try {
-      task
-    } catch {
-      case e: RequestFailedException => Left(read[Error](e.response.text))
-    }
-  }
-
   /**
    * Adds the current user as a follower of a playlist.
    *
@@ -1150,6 +1142,43 @@ class Spotify(authFlow: AuthFlow) {
 
     if (req.statusCode != 200) Left(read[Error](req.text))
     else Right(())
+  }
+
+  /**
+   * Gets detailed profile information about the current user (including the current user’s username).
+   *
+   * Reading the user’s email address requires the user-read-email scope; reading country and product subscription
+   * level requires the user-read-private scope.
+   *
+   * N.B. If the user-read-email scope is authorized, the returned [[User]] will include the email address that was
+   * entered when the user created their Spotify account. This email address is unverified; do not assume that the
+   * email address belongs to the user.
+   *
+   * @return a [[User]] on success, otherwise it returns [[Error]]
+   */
+  def getCurrentUserProfile: Either[Error, User] = withErrorHandling {
+    val req = requests.get(f"$endpoint/me", headers = List(("Authorization", f"Bearer ${authObj.accessToken}")))
+    Right(User.fromJson(read[UserJson](req.text)))
+  }
+
+  private def withErrorHandling[T](task: => Either[Error, T]): Either[Error, T] = {
+    try {
+      task
+    } catch {
+      case e: RequestFailedException => Left(read[Error](e.response.text))
+    }
+  }
+
+  /**
+   * Gets public profile information about a Spotify user.
+   *
+   * @param userID the user’s Spotify user ID
+   * @return a [[User]] on success, otherwise it returns [[Error]]
+   */
+  def getUserProfile(userID: String): Either[Error, User] = withErrorHandling {
+    val req = requests.get(f"$endpoint/users/$userID",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")))
+    Right(User.fromJson(read[UserJson](req.text)))
   }
 
   private case class FeaturedPlaylistsAnswer(message: String, playlists: Paging[PlaylistJson])

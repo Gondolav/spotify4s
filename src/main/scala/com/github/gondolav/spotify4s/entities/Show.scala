@@ -73,3 +73,15 @@ object Show {
       URI.create(json.uri)
     )
 }
+
+case class SavedShowJson(added_at: String, show: ShowJson)
+
+object SavedShowJson {
+  implicit val rw: ReadWriter[SavedShowJson] = macroRW
+}
+
+case class SavedShow(addedAt: String, show: Show)
+
+object SavedShow {
+  def fromJson(json: SavedShowJson): SavedShow = SavedShow(json.added_at, Show.fromJson(json.show))
+}

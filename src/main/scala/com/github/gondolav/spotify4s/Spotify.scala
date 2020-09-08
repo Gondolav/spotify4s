@@ -213,14 +213,6 @@ class Spotify(authFlow: AuthFlow) {
     Right((res.message, res.playlists.copy(items = res.playlists.items.map(_.map(Playlist.fromJson)))))
   }
 
-  private def withErrorHandling[T](task: => Either[Error, T]): Either[Error, T] = {
-    try {
-      task
-    } catch {
-      case e: RequestFailedException => Left(read[Error](e.response.text))
-    }
-  }
-
   /**
    * Gets a list of new album releases featured in Spotify (shown, for example, on a Spotify player’s “Browse” tab).
    *
@@ -782,6 +774,14 @@ class Spotify(authFlow: AuthFlow) {
     else Right(())
   }
 
+  private def withErrorHandling[T](task: => Either[Error, T]): Either[Error, T] = {
+    try {
+      task
+    } catch {
+      case e: RequestFailedException => Left(read[Error](e.response.text))
+    }
+  }
+
   /**
    * Adds the current user as a follower of a playlist.
    *
@@ -864,6 +864,289 @@ class Spotify(authFlow: AuthFlow) {
   def unfollowPlaylist(playlistID: String): Either[Error, Unit] = withErrorHandling {
     val req = requests.delete(f"$endpoint/playlists/$playlistID/followers",
       headers = List(("Authorization", f"Bearer ${authObj.accessToken}")))
+
+    if (req.statusCode != 200) Left(read[Error](req.text))
+    else Right(())
+  }
+
+  /**
+   * Checks if one or more albums is already saved in the current Spotify user’s ‘Your Music’ library.
+   *
+   * The user-library-read scope must have been authorized by the user.
+   *
+   * @param ids a list of the Spotify IDs for the albums. Maximum: 50 IDs
+   * @return a List of [[Boolean]]s on success (in the same order in which the IDs were specified),
+   *         otherwise it returns [[Error]]
+   */
+  def areAlbumsSaved(ids: List[String]): Either[Error, List[Boolean]] = withErrorHandling {
+    require(ids.nonEmpty, "At least one ID must be specified")
+    require(ids.length <= 50, "The maximum number of IDs is 50")
+
+    val req = requests.get(f"$endpoint/me/albums/contains",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("ids", ids.mkString(","))))
+
+    val res = read[List[Boolean]](req.text)
+    Right(res)
+  }
+
+  /**
+   * Checks if one or more shows is already saved in the current Spotify user’s library.
+   *
+   * The user-library-read scope must have been authorized by the user.
+   *
+   * @param ids a list of the Spotify IDs for the shows. Maximum: 50 IDs
+   * @return a List of [[Boolean]]s on success (in the same order in which the IDs were specified),
+   *         otherwise it returns [[Error]]
+   */
+  def areShowsSaved(ids: List[String]): Either[Error, List[Boolean]] = withErrorHandling {
+    require(ids.nonEmpty, "At least one ID must be specified")
+    require(ids.length <= 50, "The maximum number of IDs is 50")
+
+    val req = requests.get(f"$endpoint/me/shows/contains",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("ids", ids.mkString(","))))
+
+    val res = read[List[Boolean]](req.text)
+    Right(res)
+  }
+
+  /**
+   * Checks if one or more tracks is already saved in the current Spotify user’s library.
+   *
+   * The user-library-read scope must have been authorized by the user.
+   *
+   * @param ids a list of the Spotify IDs for the tracks. Maximum: 50 IDs
+   * @return a List of [[Boolean]]s on success (in the same order in which the IDs were specified),
+   *         otherwise it returns [[Error]]
+   */
+  def areTracksSaved(ids: List[String]): Either[Error, List[Boolean]] = withErrorHandling {
+    require(ids.nonEmpty, "At least one ID must be specified")
+    require(ids.length <= 50, "The maximum number of IDs is 50")
+
+    val req = requests.get(f"$endpoint/me/tracks/contains",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("ids", ids.mkString(","))))
+
+    val res = read[List[Boolean]](req.text)
+    Right(res)
+  }
+
+  /**
+   * Gets a list of the albums saved in the current Spotify user’s ‘Your Music’ library.
+   *
+   * The user-library-read scope must have been authorized by the user.
+   *
+   * @param limit  (optional) the maximum number of objects to return. Default: 20. Minimum: 1. Maximum: 50
+   * @param offset (optional) the index of the first object to return. Default: 0 (i.e., the first object). Use with limit to get
+   *               the next set of objects
+   * @param market (optional) an ISO 3166-1 alpha-2 country code or the string from_token. Provide this parameter if you want to
+   *               apply Track Relinking
+   * @return a [[Paging]] object wrapping [[SavedAlbum]]s on success, otherwise it returns [[Error]]
+   */
+  def getSavedAlbums(limit: Int = 20, offset: Int = 0, market: String = ""): Either[Error, Paging[SavedAlbum]] =
+    withErrorHandling {
+      require(1 <= limit && limit <= 50, "The limit parameter must be between 1 and 50")
+      require(0 <= offset, "The offset parameter must be non-negative")
+
+      val req = requests.get(f"$endpoint/me/albums",
+        headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+        params = List(("limit", limit.toString), ("offset", offset.toString))
+          ++ (if (market.nonEmpty) List(("market", market)) else Nil))
+
+      val res = read[Paging[SavedAlbumJson]](req.text)
+      Right(res.copy(items = res.items.map(_.map(SavedAlbum.fromJson))))
+    }
+
+  /**
+   * Get a list of shows saved in the current Spotify user’s library. Optional parameters can be used to limit the
+   * number of shows returned.
+   *
+   * The user-library-read scope must have been authorized by the user.
+   *
+   * If the current user has no shows saved, the response will be an empty array. If a show is unavailable in the given
+   * market it is filtered out. The total field in the paging object represents the number of all items, filtered or
+   * not, and thus might be larger than the actual total number of observable items.
+   *
+   * @param limit  (optional) the maximum number of shows to return. Default: 20. Minimum: 1. Maximum: 50
+   * @param offset (optional) the index of the first show to return. Default: 0 (i.e., the first object). Use with limit to get
+   *               the next set of shows
+   * @param market (optional) an ISO 3166-1 alpha-2 country code or the string from_token. Provide this parameter if you want to
+   *               apply Track Relinking
+   * @return a [[Paging]] object wrapping [[SavedShow]]s on success, otherwise it returns [[Error]]
+   */
+  def getSavedShows(limit: Int = 20, offset: Int = 0, market: String = ""): Either[Error, Paging[SavedShow]] =
+    withErrorHandling {
+      require(1 <= limit && limit <= 50, "The limit parameter must be between 1 and 50")
+      require(0 <= offset, "The offset parameter must be non-negative")
+
+      val req = requests.get(f"$endpoint/me/shows",
+        headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+        params = List(("limit", limit.toString), ("offset", offset.toString))
+          ++ (if (market.nonEmpty) List(("market", market)) else Nil))
+
+      val res = read[Paging[SavedShowJson]](req.text)
+      Right(res.copy(items = res.items.map(_.map(SavedShow.fromJson))))
+    }
+
+  /**
+   * Get a list of shows saved in the current Spotify user’s library. Optional parameters can be used to limit the
+   * number of shows returned.
+   *
+   * The user-library-read scope must have been authorized by the user.
+   *
+   * @param limit  (optional) the maximum number of objects to return. Default: 20. Minimum: 1. Maximum: 50
+   * @param offset (optional) the index of the first object to return. Default: 0 (i.e., the first object). Use with limit to get
+   *               the next set of objects
+   * @param market (optional) an ISO 3166-1 alpha-2 country code or the string from_token. Provide this parameter if you want to
+   *               apply Track Relinking
+   * @return a [[Paging]] object wrapping [[SavedTrack]]s on success, otherwise it returns [[Error]]
+   */
+  def getSavedTracks(limit: Int = 20, offset: Int = 0, market: String = ""): Either[Error, Paging[SavedTrack]] =
+    withErrorHandling {
+      require(1 <= limit && limit <= 50, "The limit parameter must be between 1 and 50")
+      require(0 <= offset, "The offset parameter must be non-negative")
+
+      val req = requests.get(f"$endpoint/me/tracks",
+        headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+        params = List(("limit", limit.toString), ("offset", offset.toString))
+          ++ (if (market.nonEmpty) List(("market", market)) else Nil))
+
+      val res = read[Paging[SavedTrackJson]](req.text)
+      Right(res.copy(items = res.items.map(_.map(SavedTrack.fromJson))))
+    }
+
+  /**
+   * Removes one or more albums from the current user’s ‘Your Music’ library.
+   *
+   * Modification of the current user’s “Your Music” collection requires authorization of the user-library-modify scope.
+   *
+   * N.B. Changes to a user’s saved albums may not be visible in other Spotify applications immediately.
+   *
+   * @param ids a list of the Spotify IDs for the albums. Maximum: 50 IDs.
+   * @return [[Unit]] on success, otherwise it returns [[Error]]
+   */
+  def removeSavedAlbums(ids: List[String]): Either[Error, Unit] = withErrorHandling {
+    require(ids.nonEmpty, "At least one ID must be specified")
+    require(ids.length <= 50, "The maximum number of IDs is 50")
+
+    val req = requests.delete(f"$endpoint/me/albums",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("ids", ids.mkString(","))))
+
+    if (req.statusCode != 200) Left(read[Error](req.text))
+    else Right(())
+  }
+
+  /**
+   * Removes one or more shows from the current user’s ‘Your Music’ library.
+   *
+   * The user-library-modify scope must have been authorized by the user.
+   *
+   * N.B. Changes to a user’s saved shows may not be visible in other Spotify applications immediately.
+   *
+   * @param ids    a list of the Spotify IDs for the shows to be deleted from the user’s library. Maximum: 50 IDs
+   * @param market an ISO 3166-1 alpha-2 country code. If a country code is specified, only shows that are available in
+   *               that market will be removed.
+   *
+   *               If a valid user access token is specified in the request header, the country associated with the
+   *               user account will take priority over this parameter.
+   *
+   *               Note: If neither market or user country are provided, the content is considered unavailable for
+   *               the client.
+   *
+   *               Users can view the country that is associated with their account in the account settings.
+   * @return [[Unit]] on success, otherwise it returns [[Error]]
+   */
+  def removeSavedShows(ids: List[String], market: String = ""): Either[Error, Unit] = withErrorHandling {
+    require(ids.nonEmpty, "At least one ID must be specified")
+    require(ids.length <= 50, "The maximum number of IDs is 50")
+
+    val req = requests.delete(f"$endpoint/me/shows",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("ids", ids.mkString(","))) ++ (if (market.nonEmpty) List(("market", market)) else Nil))
+
+    if (req.statusCode != 200) Left(read[Error](req.text))
+    else Right(())
+  }
+
+  /**
+   * Removes one or more tracks from the current user’s ‘Your Music’ library.
+   *
+   * Modification of the current user’s “Your Music” collection requires authorization of the user-library-modify scope.
+   *
+   * N.B. Changes to a user’s saved tracks may not be visible in other Spotify applications immediately.
+   *
+   * @param ids a list of the Spotify IDs for the tracks. Maximum: 50 IDs
+   * @return [[Unit]] on success, otherwise it returns [[Error]]
+   */
+  def removeSavedTracks(ids: List[String]): Either[Error, Unit] = withErrorHandling {
+    require(ids.nonEmpty, "At least one ID must be specified")
+    require(ids.length <= 50, "The maximum number of IDs is 50")
+
+    val req = requests.delete(f"$endpoint/me/tracks",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("ids", ids.mkString(","))))
+
+    if (req.statusCode != 200) Left(read[Error](req.text))
+    else Right(())
+  }
+
+  /**
+   * Saves one or more albums to the current user’s ‘Your Music’ library.
+   *
+   * Modification of the current user’s “Your Music” collection requires authorization of the user-library-modify scope.
+   *
+   * @param ids a list of the Spotify IDs for the albums. Maximum: 50 IDs
+   * @return [[Unit]] on success, otherwise it returns [[Error]]
+   */
+  def saveAlbums(ids: List[String]): Either[Error, Unit] = withErrorHandling {
+    require(ids.nonEmpty, "At least one ID must be specified")
+    require(ids.length <= 50, "The maximum number of IDs is 50")
+
+    val req = requests.put(f"$endpoint/me/albums",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("ids", ids.mkString(","))))
+
+    if (req.statusCode != 200) Left(read[Error](req.text))
+    else Right(())
+  }
+
+  /**
+   * Saves one or more shows to the current user’s ‘Your Music’ library.
+   *
+   * The user-library-modify scope must have been authorized by the user.
+   *
+   * @param ids a list of the Spotify IDs for the shows to be added to the user’s library. Maximum: 50 IDs
+   * @return [[Unit]] on success, otherwise it returns [[Error]]
+   */
+  def saveShows(ids: List[String]): Either[Error, Unit] = withErrorHandling {
+    require(ids.nonEmpty, "At least one ID must be specified")
+    require(ids.length <= 50, "The maximum number of IDs is 50")
+
+    val req = requests.put(f"$endpoint/me/shows",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("ids", ids.mkString(","))))
+
+    if (req.statusCode != 200) Left(read[Error](req.text))
+    else Right(())
+  }
+
+  /**
+   * Saves one or more tracks to the current user’s ‘Your Music’ library.
+   *
+   * Modification of the current user’s “Your Music” collection requires authorization of the user-library-modify scope.
+   *
+   * @param ids a list of the Spotify IDs for the tracks. Maximum: 50 IDs
+   * @return [[Unit]] on success, otherwise it returns [[Error]]
+   */
+  def saveTracks(ids: List[String]): Either[Error, Unit] = withErrorHandling {
+    require(ids.nonEmpty, "At least one ID must be specified")
+    require(ids.length <= 50, "The maximum number of IDs is 50")
+
+    val req = requests.put(f"$endpoint/me/tracks",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("ids", ids.mkString(","))))
 
     if (req.statusCode != 200) Left(read[Error](req.text))
     else Right(())

@@ -96,3 +96,15 @@ object Album {
       ObjectType.fromString(json.`type`),
       URI.create(json.uri))
 }
+
+case class SavedAlbumJson(added_at: String, album: AlbumJson)
+
+object SavedAlbumJson {
+  implicit val rw: ReadWriter[SavedAlbumJson] = macroRW
+}
+
+case class SavedAlbum(addedAt: String, album: Album)
+
+object SavedAlbum {
+  def fromJson(json: SavedAlbumJson): SavedAlbum = SavedAlbum(json.added_at, Album.fromJson(json.album))
+}

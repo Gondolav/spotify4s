@@ -84,3 +84,15 @@ object Track {
     json.is_local
   )
 }
+
+case class SavedTrackJson(added_at: String, track: TrackJson)
+
+object SavedTrackJson {
+  implicit val rw: ReadWriter[SavedTrackJson] = macroRW
+}
+
+case class SavedTrack(addedAt: String, track: Track)
+
+object SavedTrack {
+  def fromJson(json: SavedTrackJson): SavedTrack = SavedTrack(json.added_at, Track.fromJson(json.track))
+}

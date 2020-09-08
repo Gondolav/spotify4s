@@ -66,7 +66,7 @@ class Spotify(authFlow: AuthFlow) {
       params = List(("limit", limit.toString), ("offset", offset.toString)) ++ (if (market.nonEmpty) List(("market", market)) else Nil))
 
     val res = read[Paging[TrackJson]](req.text)
-    Right(res.copy(items = res.items.map(tracks => tracks.map(Track.fromJson))))
+    Right(res.copy(items = res.items.map(_.map(Track.fromJson))))
   }
 
   /**
@@ -133,7 +133,7 @@ class Spotify(authFlow: AuthFlow) {
       map("playlists")
     }
 
-    Right(res.copy(items = res.items.map(playlists => playlists.map(Playlist.fromJson))))
+    Right(res.copy(items = res.items.map(_.map(Playlist.fromJson))))
   }
 
   /**
@@ -210,7 +210,15 @@ class Spotify(authFlow: AuthFlow) {
 
     val res = read[FeaturedPlaylistsAnswer](req.text)
 
-    Right((res.message, res.playlists.copy(items = res.playlists.items.map(playlists => playlists.map(Playlist.fromJson)))))
+    Right((res.message, res.playlists.copy(items = res.playlists.items.map(_.map(Playlist.fromJson)))))
+  }
+
+  private def withErrorHandling[T](task: => Either[Error, T]): Either[Error, T] = {
+    try {
+      task
+    } catch {
+      case e: RequestFailedException => Left(read[Error](e.response.text))
+    }
   }
 
   /**
@@ -238,7 +246,7 @@ class Spotify(authFlow: AuthFlow) {
       map("albums")
     }
 
-    Right(res.copy(items = res.items.map(albums => albums.map(Album.fromJson))))
+    Right(res.copy(items = res.items.map(_.map(Album.fromJson))))
   }
 
   /**
@@ -328,7 +336,7 @@ class Spotify(authFlow: AuthFlow) {
         (if (includeGroups.nonEmpty) List(("include_groups", includeGroups.mkString(","))) else Nil))
 
     val res = read[Paging[AlbumJson]](req.text)
-    Right(res.copy(items = res.items.map(albums => albums.map(Album.fromJson))))
+    Right(res.copy(items = res.items.map(_.map(Album.fromJson))))
   }
 
   /**
@@ -516,7 +524,7 @@ class Spotify(authFlow: AuthFlow) {
         (if (market.nonEmpty) List(("market", market)) else Nil))
 
     val res = read[Paging[EpisodeJson]](req.text)
-    Right(res.copy(items = res.items.map(episodes => episodes.map(Episode.fromJson))))
+    Right(res.copy(items = res.items.map(_.map(Episode.fromJson))))
   }
 
   /**
@@ -598,14 +606,6 @@ class Spotify(authFlow: AuthFlow) {
     Right(res("tracks").map(Track.fromJson))
   }
 
-  private def withErrorHandling[T](task: => Right[Nothing, T]): Either[Error, T] = {
-    try {
-      task
-    } catch {
-      case e: RequestFailedException => Left(read[Error](e.response.text))
-    }
-  }
-
   /**
    * Gets Spotify catalog information for a single track identified by its unique Spotify ID.
    *
@@ -675,23 +675,23 @@ class Spotify(authFlow: AuthFlow) {
         case AlbumObj =>
           val json = read[Map[String, Paging[AlbumJson]]](req.text)
           val res = json("albums")
-          res.copy(items = res.items.map(albums => albums.map(Album.fromJson)))
+          res.copy(items = res.items.map(_.map(Album.fromJson)))
         case ArtistObj =>
           val json = read[Map[String, Paging[ArtistJson]]](req.text)
           val res = json("artists")
-          res.copy(items = res.items.map(artists => artists.map(Artist.fromJson)))
+          res.copy(items = res.items.map(_.map(Artist.fromJson)))
         case EpisodeObj =>
           val json = read[Map[String, Paging[EpisodeJson]]](req.text)
           val res = json("episodes")
-          res.copy(items = res.items.map(episodes => episodes.map(Episode.fromJson)))
+          res.copy(items = res.items.map(_.map(Episode.fromJson)))
         case ShowObj =>
           val json = read[Map[String, Paging[ShowJson]]](req.text)
           val res = json("shows")
-          res.copy(items = res.items.map(shows => shows.map(Show.fromJson)))
+          res.copy(items = res.items.map(_.map(Show.fromJson)))
         case TrackObj =>
           val json = read[Map[String, Paging[TrackJson]]](req.text)
           val res = json("tracks")
-          res.copy(items = res.items.map(tracks => tracks.map(Track.fromJson)))
+          res.copy(items = res.items.map(_.map(Track.fromJson)))
       }
     }
 
@@ -704,6 +704,169 @@ class Spotify(authFlow: AuthFlow) {
       requestObjectType(obj)
     }).map(fut => Await.result(fut, Duration.Inf))
     Right(pagings)
+  }
+
+  /**
+   * Checks to see if the current user is following one or more artists or other Spotify users.
+   *
+   * Getting details of the artists or users the current user follows requires authorization of the user-follow-read
+   * scope.
+   *
+   * @param idType the ID type: either artist or user
+   * @param ids    a list of the artist or the user Spotify IDs to check. A maximum of 50 IDs can be sent in one request
+   * @return a List of [[Boolean]]s on success (in the same order in which the IDs were specified),
+   *         otherwise it returns [[Error]]
+   */
+  def isFollowing(idType: String, ids: List[String]): Either[Error, List[Boolean]] = withErrorHandling {
+    require(idType == "artist" || idType == "user", "The ID type can be either 'artist' or 'user'")
+    require(ids.nonEmpty, "At least one ID must be specified")
+    require(ids.length <= 50, "The maximum number of IDs is 50")
+
+    val req = requests.get(f"$endpoint/me/following/contains",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("type", idType), ("ids", ids.mkString(","))))
+
+    val res = read[List[Boolean]](req.text)
+    Right(res)
+  }
+
+  /**
+   * Checks to see if one or more Spotify users are following a specified playlist.
+   *
+   * Following a playlist can be done publicly or privately.
+   *
+   * Checking if a user publicly follows a playlist doesn’t
+   * require any scopes; if the user is publicly following the playlist, this endpoint returns true.
+   *
+   * Checking if the user is privately following a playlist is only possible for the current user when that
+   * user has granted access to the playlist-read-private scope.
+   *
+   * @param playlistID the Spotify ID of the playlist
+   * @param ids        a list of Spotify User IDs; the ids of the users that you want to check to see if they follow the
+   *                   playlist. Maximum: 5 IDs
+   * @return a List of [[Boolean]]s on success (in the same order in which the IDs were specified),
+   *         otherwise it returns [[Error]]
+   */
+  def areUsersFollowingPlaylist(playlistID: String, ids: List[String]): Either[Error, List[Boolean]] = withErrorHandling {
+    require(ids.nonEmpty, "At least one ID must be specified")
+    require(ids.length <= 5, "The maximum number of IDs is 5")
+
+    val req = requests.get(f"$endpoint/playlists/$playlistID/followers/contains",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("ids", ids.mkString(","))))
+
+    val res = read[List[Boolean]](req.text)
+    Right(res)
+  }
+
+  /**
+   * Adds the current user as a follower of one or more artists or other Spotify users.
+   *
+   * Modifying the list of artists or users the current user follows requires authorization of the user-follow-modify
+   * scope.
+   *
+   * @param idType the ID type: either artist or user
+   * @param ids    a list of the artist or the user Spotify IDs. A maximum of 50 IDs can be sent in one request
+   * @return [[Unit]] on success, otherwise it returns [[Error]]
+   */
+  def follow(idType: String, ids: List[String]): Either[Error, Unit] = withErrorHandling {
+    require(idType == "artist" || idType == "user", "The ID type can be either 'artist' or 'user'")
+    require(ids.nonEmpty, "At least one ID must be specified")
+    require(ids.length <= 50, "The maximum number of IDs is 50")
+
+    val req = requests.put(f"$endpoint/me/following",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("type", idType), ("ids", ids.mkString(","))))
+
+    if (req.statusCode != 204) Left(read[Error](req.text))
+    else Right(())
+  }
+
+  /**
+   * Adds the current user as a follower of a playlist.
+   *
+   * Following a playlist publicly requires authorization of the playlist-modify-public scope; following it privately
+   * requires the playlist-modify-private scope.
+   *
+   * @param playlistID the Spotify ID of the playlist. Any playlist can be followed, regardless of its public/private
+   *                   status, as long as you know its playlist ID
+   * @param public     (optional) defaults to true. If true the playlist will be included in user’s public playlists,
+   *                   if false it will remain private. To be able to follow playlists privately, the user must have
+   *                   granted the playlist-modify-private scope
+   * @return [[Unit]] on success, otherwise it returns [[Error]]
+   */
+  def followPlaylist(playlistID: String, public: Boolean = true): Either[Error, Unit] = withErrorHandling {
+    val req = requests.put(f"$endpoint/playlists/$playlistID/followers",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}"), ("Content-Type", "application/json")),
+      data = List(("public", public.toString)))
+
+    if (req.statusCode != 200) Left(read[Error](req.text))
+    else Right(())
+  }
+
+  /**
+   * Gets the current user’s followed artists.
+   *
+   * Getting details of the artists or users the current user follows requires authorization of the user-follow-read
+   * scope.
+   *
+   * @param limit (optional) the maximum number of items to return. Default: 20. Minimum: 1. Maximum: 50
+   * @param after (optional) the last artist ID retrieved from the previous request
+   * @return a [[CursorPaging]] object wrapping [[Artist]]s on success, otherwise it returns [[Error]]
+   */
+  def getFollowedArtists(limit: Int = 20, after: String = ""): Either[Error, CursorPaging[Artist]] = withErrorHandling {
+    require(1 <= limit && limit <= 50, "The limit parameter must be between 1 and 50")
+
+    val req = requests.get(f"$endpoint/me/following",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("limit", limit.toString), ("type", "artist"))
+        ++ (if (after.nonEmpty) List(("after", after)) else Nil))
+
+    val res = {
+      val json = read[Map[String, CursorPaging[ArtistJson]]](req.text)
+      json("artists")
+    }
+    Right(res.copy(items = res.items.map(_.map(Artist.fromJson))))
+  }
+
+  /**
+   * Removes the current user as a follower of one or more artists or other Spotify users.
+   *
+   * Modifying the list of artists or users the current user follows requires authorization of the user-follow-modify
+   * scope.
+   *
+   * @param idType the ID type: either artist or user
+   * @param ids    a list of the artist or the user Spotify IDs. A maximum of 50 IDs can be sent in one request
+   * @return [[Unit]] on success, otherwise it returns [[Error]]
+   */
+  def unfollow(idType: String, ids: List[String]): Either[Error, Unit] = withErrorHandling {
+    require(idType == "artist" || idType == "user", "The ID type can be either 'artist' or 'user'")
+    require(ids.nonEmpty, "At least one ID must be specified")
+    require(ids.length <= 50, "The maximum number of IDs is 50")
+
+    val req = requests.delete(f"$endpoint/me/following",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("type", idType), ("ids", ids.mkString(","))))
+
+    if (req.statusCode != 204) Left(read[Error](req.text))
+    else Right(())
+  }
+
+  /**
+   * Removes the current user as a follower of a playlist.
+   *
+   * Unfollowing a publicly followed playlist for a user requires authorization of the playlist-modify-public scope;
+   * unfollowing a privately followed playlist requires the playlist-modify-private scope.
+   *
+   * @param playlistID the Spotify ID of the playlist that is to be no longer followed
+   * @return [[Unit]] on success, otherwise it returns [[Error]]
+   */
+  def unfollowPlaylist(playlistID: String): Either[Error, Unit] = withErrorHandling {
+    val req = requests.delete(f"$endpoint/playlists/$playlistID/followers",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")))
+
+    if (req.statusCode != 200) Left(read[Error](req.text))
+    else Right(())
   }
 
   private case class FeaturedPlaylistsAnswer(message: String, playlists: Paging[PlaylistJson])

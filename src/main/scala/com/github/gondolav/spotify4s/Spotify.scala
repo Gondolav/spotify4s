@@ -698,6 +698,14 @@ class Spotify(authFlow: AuthFlow) {
     Right(pagings)
   }
 
+  private def withErrorHandling[T](task: => Either[Error, T]): Either[Error, T] = {
+    try {
+      task
+    } catch {
+      case e: RequestFailedException => Left(read[Error](e.response.text))
+    }
+  }
+
   /**
    * Checks to see if the current user is following one or more artists or other Spotify users.
    *
@@ -1161,14 +1169,6 @@ class Spotify(authFlow: AuthFlow) {
     Right(User.fromJson(read[UserJson](req.text)))
   }
 
-  private def withErrorHandling[T](task: => Either[Error, T]): Either[Error, T] = {
-    try {
-      task
-    } catch {
-      case e: RequestFailedException => Left(read[Error](e.response.text))
-    }
-  }
-
   /**
    * Gets public profile information about a Spotify user.
    *
@@ -1179,6 +1179,58 @@ class Spotify(authFlow: AuthFlow) {
     val req = requests.get(f"$endpoint/users/$userID",
       headers = List(("Authorization", f"Bearer ${authObj.accessToken}")))
     Right(User.fromJson(read[UserJson](req.text)))
+  }
+
+  /**
+   * Gets the current user’s top artists based on calculated affinity.
+   *
+   * Getting details of a user’s top artists and tracks requires authorization of the user-top-read scope.
+   *
+   * @param limit     (optional) the number of entities to return. Default: 20. Minimum: 1. Maximum: 50
+   * @param offset    (optional) the index of the first entity to return. Default: 0 (i.e., the first track). Use with
+   *                  limit to get the next set of entities
+   * @param timeRange (optional) Over what time frame the affinities are computed. Valid values: [[LongTerm]]
+   *                  (calculated from several years of data and including all new data as it becomes available),
+   *                  [[MediumTerm]] (approximately last 6 months), [[ShortTerm]] (approximately last 4 weeks).
+   *                  Default: MediumTerm.
+   * @return a [[Paging]] object wrapping [[Artist]]s on success, otherwise it returns [[Error]]
+   */
+  def getTopArtists(limit: Int = 20, offset: Int = 0, timeRange: TimeRange = MediumTerm): Either[Error, Paging[Artist]] = withErrorHandling {
+    require(1 <= limit && limit <= 50, "The limit parameter must be between 1 and 50")
+    require(0 <= offset, "The offset parameter must be non-negative")
+
+    val req = requests.get(f"$endpoint/me/top/artists",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("limit", limit.toString), ("offset", offset.toString), ("time_range", timeRange.toString)))
+
+    val res = read[Paging[ArtistJson]](req.text)
+    Right(res.copy(items = res.items.map(_.map(Artist.fromJson))))
+  }
+
+  /**
+   * Gets the current user’s top tracks based on calculated affinity.
+   *
+   * Getting details of a user’s top artists and tracks requires authorization of the user-top-read scope.
+   *
+   * @param limit     (optional) the number of entities to return. Default: 20. Minimum: 1. Maximum: 50
+   * @param offset    (optional) the index of the first entity to return. Default: 0 (i.e., the first track). Use with
+   *                  limit to get the next set of entities
+   * @param timeRange (optional) Over what time frame the affinities are computed. Valid values: [[LongTerm]]
+   *                  (calculated from several years of data and including all new data as it becomes available),
+   *                  [[MediumTerm]] (approximately last 6 months), [[ShortTerm]] (approximately last 4 weeks).
+   *                  Default: MediumTerm.
+   * @return a [[Paging]] object wrapping [[Track]]s on success, otherwise it returns [[Error]]
+   */
+  def getTopTracks(limit: Int = 20, offset: Int = 0, timeRange: TimeRange = MediumTerm): Either[Error, Paging[Track]] = withErrorHandling {
+    require(1 <= limit && limit <= 50, "The limit parameter must be between 1 and 50")
+    require(0 <= offset, "The offset parameter must be non-negative")
+
+    val req = requests.get(f"$endpoint/me/top/tracks",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("limit", limit.toString), ("offset", offset.toString), ("time_range", timeRange.toString)))
+
+    val res = read[Paging[TrackJson]](req.text)
+    Right(res.copy(items = res.items.map(_.map(Track.fromJson))))
   }
 
   private case class FeaturedPlaylistsAnswer(message: String, playlists: Paging[PlaylistJson])

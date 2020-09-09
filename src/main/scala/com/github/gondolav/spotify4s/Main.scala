@@ -8,8 +8,8 @@ object Main {
   val clientSecret = "d57182bc22304585b6837788f73bdad1"
 
   def main(args: Array[String]): Unit = {
-    val s = Spotify(clientID, clientSecret, URI.create("http://localhost"), List("user-read-email"))
-    println(s.getUserProfile("tuggareutangranser"))
+    val s = Spotify(clientID, clientSecret, URI.create("http://localhost"), List("user-top-read"))
+    println(s.getTopTracks())
   }
 
 }

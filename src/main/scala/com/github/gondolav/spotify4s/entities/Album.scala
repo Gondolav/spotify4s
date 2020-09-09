@@ -40,16 +40,16 @@ sealed trait AlbumType
 object AlbumType {
   def fromString(s: String): AlbumType = s.toLowerCase match {
     case "album" => AlbumT
-    case "single" => Single
-    case "compilation" => Compilation
+    case "single" => SingleT
+    case "compilation" => CompilationT
   }
 }
 
-case object AlbumT extends AlbumType // to avoid conflicts with Album
+case object AlbumT extends AlbumType // the T is added to avoid conflicts with Album
 
-case object Single extends AlbumType
+case object SingleT extends AlbumType
 
-case object Compilation extends AlbumType
+case object CompilationT extends AlbumType
 
 case class Album(albumGroup: Option[String] = None,
                  albumType: AlbumType,

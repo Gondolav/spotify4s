@@ -1233,6 +1233,61 @@ class Spotify(authFlow: AuthFlow) {
     Right(res.copy(items = res.items.map(_.map(Track.fromJson))))
   }
 
+  /**
+   * Adds one or more items to a user’s playlist.
+   *
+   * Adding items to the current user’s public playlists requires authorization of the playlist-modify-public scope;
+   * adding items to the current user’s private playlist (including collaborative playlists) requires the
+   * playlist-modify-private scope.
+   *
+   * @param playlistID the Spotify ID for the playlist
+   * @param uris       a list of Spotify URIs to add, can be track or episode URIs. A maximum of 100 items
+   *                   can be added in one request
+   * @param position   the position to insert the items, a zero-based index. For example, to insert the items in the
+   *                   first position: position=0; to insert the items in the third position: position=2 . If omitted,
+   *                   the items will be appended to the playlist. Items are added in the order they are listed in the
+   *                   query string or request body.
+   * @return a [[String]] representing a snapshot ID (which can be used to identify your playlist version in future
+   *         requests) on success, otherwise it returns [[Error]]
+   */
+  def addItemsToPlaylist(playlistID: String, uris: List[String], position: Int): Either[Error, String] = withErrorHandling {
+    require(uris.nonEmpty, "At least one URI must be specified")
+    require(uris.length <= 100, "The maximum number of URis is 100")
+    require(0 <= position, "The position parameter must be non-negative")
+
+    val req = requests.post(f"$endpoint/playlists/$playlistID/tracks",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}"), ("Content-Type", "application/json")),
+      params = List(("uris", uris.mkString(",")), ("position", position.toString)))
+
+    val res = read[Map[String, String]](req.text)
+    Right(res("snapshot_id"))
+  }
+
+  /**
+   * Adds one or more items to a user’s playlist.
+   *
+   * Adding items to the current user’s public playlists requires authorization of the playlist-modify-public scope;
+   * adding items to the current user’s private playlist (including collaborative playlists) requires the
+   * playlist-modify-private scope.
+   *
+   * @param playlistID the Spotify ID for the playlist
+   * @param uris       a list of Spotify URIs to add, can be track or episode URIs. A maximum of 100 items
+   *                   can be added in one request
+   * @return a [[String]] representing a snapshot ID (which can be used to identify your playlist version in future
+   *         requests) on success, otherwise it returns [[Error]]
+   */
+  def addItemsToPlaylist(playlistID: String, uris: List[String]): Either[Error, String] = withErrorHandling {
+    require(uris.nonEmpty, "At least one URI must be specified")
+    require(uris.length <= 100, "The maximum number of URis is 100")
+
+    val req = requests.post(f"$endpoint/playlists/$playlistID/tracks",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("uris", uris.mkString(","))))
+
+    val res = read[Map[String, String]](req.text)
+    Right(res("snapshot_id"))
+  }
+
   private case class FeaturedPlaylistsAnswer(message: String, playlists: Paging[PlaylistJson])
 
   private object FeaturedPlaylistsAnswer { // actually used

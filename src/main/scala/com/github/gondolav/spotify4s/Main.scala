@@ -9,7 +9,7 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     val s = Spotify(clientID, clientSecret, URI.create("http://localhost"), List("playlist-modify-public", "playlist-modify-private"))
-    println(s.addItemsToPlaylist("7oi0w0SLbJ4YyjrOxhZbUv", List("spotify:track:4iV5W9uYEdYUVa79Axb7Rh","spotify:track:1301WleyT98MSxVHPZCA6M")))
+    println(s.getUserPlaylists("wizzler"))
   }
 
 }

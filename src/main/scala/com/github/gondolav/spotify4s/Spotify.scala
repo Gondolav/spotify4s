@@ -576,6 +576,14 @@ class Spotify(authFlow: AuthFlow) {
     Right(res("audio_features").map(AudioFeatures.fromJson))
   }
 
+  private def withErrorHandling[T](task: => Either[Error, T]): Either[Error, T] = {
+    try {
+      task
+    } catch {
+      case e: RequestFailedException => Left(read[Error](e.response.text))
+    }
+  }
+
   /**
    * Gets Spotify catalog information for multiple tracks based on their Spotify IDs.
    *
@@ -696,14 +704,6 @@ class Spotify(authFlow: AuthFlow) {
       requestObjectType(obj)
     }).map(fut => Await.result(fut, Duration.Inf))
     Right(pagings)
-  }
-
-  private def withErrorHandling[T](task: => Either[Error, T]): Either[Error, T] = {
-    try {
-      task
-    } catch {
-      case e: RequestFailedException => Left(read[Error](e.response.text))
-    }
   }
 
   /**
@@ -1286,6 +1286,111 @@ class Spotify(authFlow: AuthFlow) {
 
     val res = read[Map[String, String]](req.text)
     Right(res("snapshot_id"))
+  }
+
+  /**
+   * Creates a playlist for a Spotify user. (The playlist will be empty until you add tracks.)
+   *
+   * Creating a public playlist for a user requires authorization of the playlist-modify-public scope; creating a
+   * private playlist requires the playlist-modify-private scope.
+   *
+   * @param userID        the user’s Spotify user ID
+   * @param name          the name for the new playlist, for example "Your Coolest Playlist" . This name does not need to be
+   *                      unique; a user may have several playlists with the same name
+   * @param public        (optional) defaults to true. If true the playlist will be public, if false it will be private. To
+   *                      be able to create private playlists, the user must have granted the playlist-modify-private scope
+   * @param collaborative (optional) defaults to false. If true the playlist will be collaborative. Note that to create
+   *                      a collaborative playlist you must also set public to false. To create collaborative playlists
+   *                      you must have granted playlist-modify-private and playlist-modify-public scopes
+   * @param description   (optional) value for playlist description as displayed in Spotify Clients and in the Web API
+   * @return a [[Playlist]] on success, otherwise it returns [[Error]]
+   */
+  def createPlaylist(userID: String, name: String, public: Boolean = true, collaborative: Boolean = false,
+                     description: String = ""): Either[Error, Playlist] = withErrorHandling {
+    val req = requests.post(f"$endpoint/users/$userID/playlists",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}"), ("Content-Type", "application/json")),
+      data = write(Map("name" -> name, "public" -> public.toString, "collaborative" -> collaborative.toString)
+        ++ (if (description.nonEmpty) Map("description" -> description) else Map.empty)))
+
+    val res = read[PlaylistJson](req.text)
+    Right(Playlist.fromJson(res))
+  }
+
+  /**
+   * Changes a playlist’s name and public/private state. (The user must, of course, own the playlist.)
+   *
+   * Changing a public playlist for a user requires authorization of the playlist-modify-public scope; changing a
+   * private playlist requires the playlist-modify-private scope.
+   *
+   * @param playlistID the Spotify ID for the playlist
+   * @param details    a map storing the details to be changed. Allowed key values are 'name', 'public', 'collaborative'
+   *                   and 'description'
+   * @return [[Unit]] on success, otherwise it returns [[Error]]
+   */
+  def changePlaylistDetails(playlistID: String, details: Map[String, String]): Either[Error, Unit] = withErrorHandling {
+    require(details.nonEmpty, "The details map parameter must be non-empty")
+    val keys = details.keySet
+    val allowedKeys = Set("name", "public", "collaborative", "description")
+    require(keys.subsetOf(allowedKeys), "The details map parameter " +
+      "must contain at least one parameter between 'name', 'public', 'collaborative' and 'description'. No other " +
+      "paramer is allowed")
+
+    val req = requests.put(f"$endpoint/playlists/$playlistID",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}"), ("Content-Type", "application/json")),
+      data = write(details))
+
+    if (req.statusCode != 200) Left(read[Error](req.text))
+    else Right(())
+  }
+
+  /**
+   * Gets a list of the playlists owned or followed by the current Spotify user.
+   *
+   * Private playlists are only retrievable for the current user and requires the playlist-read-private scope to have
+   * been authorized by the user. Note that this scope alone will not return collaborative playlists, even though they
+   * are always private. Collaborative playlists are only retrievable for the current user and requires the
+   * playlist-read-collaborative scope to have been authorized by the user.
+   *
+   * @param limit  (optional) the maximum number of playlists to return. Default: 20. Minimum: 1. Maximum: 50
+   * @param offset (optional) the index of the first playlist to return. Default: 0 (the first object).
+   *               Maximum offset: 100.000. Use with limit to get the next set of playlists
+   * @return a [[Paging]] object wrapping [[Playlist]]s on success, otherwise it returns [[Error]]
+   */
+  def getCurrentUserPlaylists(limit: Int = 20, offset: Int = 0): Either[Error, Paging[Playlist]] = withErrorHandling {
+    require(1 <= limit && limit <= 50, "The limit parameter must be between 1 and 50")
+    require(0 <= offset && offset <= 100000, "The offset parameter must be between 0 and 100000")
+
+    val req = requests.get(f"$endpoint/me/playlists",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("limit", limit.toString), ("offset", offset.toString)))
+
+    val res = read[Paging[PlaylistJson]](req.text)
+    Right(res.copy(items = res.items.map(_.map(Playlist.fromJson))))
+  }
+
+  /**
+   * Gets a list of the playlists owned or followed by a Spotify user.
+   *
+   * Private playlists are only retrievable for the current user and requires the playlist-read-private scope to have
+   * been authorized by the user. Note that this scope alone will not return collaborative playlists, even though they
+   * are always private. Collaborative playlists are only retrievable for the current user and requires the
+   * playlist-read-collaborative scope to have been authorized by the user.
+   *
+   * @param limit  (optional) the maximum number of playlists to return. Default: 20. Minimum: 1. Maximum: 50
+   * @param offset (optional) the index of the first playlist to return. Default: 0 (the first object).
+   *               Maximum offset: 100.000. Use with limit to get the next set of playlists
+   * @return a [[Paging]] object wrapping [[Playlist]]s on success, otherwise it returns [[Error]]
+   */
+  def getUserPlaylists(userID: String, limit: Int = 20, offset: Int = 0): Either[Error, Paging[Playlist]] = withErrorHandling {
+    require(1 <= limit && limit <= 50, "The limit parameter must be between 1 and 50")
+    require(0 <= offset && offset <= 100000, "The offset parameter must be between 0 and 100000")
+
+    val req = requests.get(f"$endpoint/users/$userID/playlists",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("limit", limit.toString), ("offset", offset.toString)))
+
+    val res = read[Paging[PlaylistJson]](req.text)
+    Right(res.copy(items = res.items.map(_.map(Playlist.fromJson))))
   }
 
   private case class FeaturedPlaylistsAnswer(message: String, playlists: Paging[PlaylistJson])

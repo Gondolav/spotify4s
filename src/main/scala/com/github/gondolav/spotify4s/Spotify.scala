@@ -4,7 +4,7 @@ import java.net.URI
 
 import com.github.gondolav.spotify4s.auth._
 import com.github.gondolav.spotify4s.entities._
-import requests.RequestFailedException
+import requests.{RequestFailedException, Response}
 import upickle.default._
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -458,6 +458,14 @@ class Spotify(authFlow: AuthFlow) {
     Right(Show.fromJson(res))
   }
 
+  private def withErrorHandling[T](task: => Either[Error, T]): Either[Error, T] = {
+    try {
+      task
+    } catch {
+      case e: RequestFailedException => Left(read[Error](e.response.text))
+    }
+  }
+
   /**
    * Gets Spotify catalog information for multiple shows based on their Spotify IDs.
    *
@@ -574,14 +582,6 @@ class Spotify(authFlow: AuthFlow) {
 
     val res = read[Map[String, List[AudioFeaturesJson]]](req.text)
     Right(res("audio_features").map(AudioFeatures.fromJson))
-  }
-
-  private def withErrorHandling[T](task: => Either[Error, T]): Either[Error, T] = {
-    try {
-      task
-    } catch {
-      case e: RequestFailedException => Left(read[Error](e.response.text))
-    }
   }
 
   /**
@@ -1392,6 +1392,119 @@ class Spotify(authFlow: AuthFlow) {
     val res = read[Paging[PlaylistJson]](req.text)
     Right(res.copy(items = res.items.map(_.map(Playlist.fromJson))))
   }
+
+  /**
+   * Gets a playlist owned by a Spotify user.
+   *
+   * Both Public and Private playlists belonging to any user are retrievable on provision of a valid access token.
+   *
+   * If an episode is unavailable in the given market, its information will not be included in the response.
+   *
+   * @param playlistID the Spotify ID for the playlist
+   * @param fields     (optional) filters for the query: a string containing a comma-separated list of the fields to return.
+   *                   If omitted, all fields are returned. For example, to get just the playlist’s description and URI:
+   *                   fields=description,uri. A dot separator can be used to specify non-reoccurring fields, while
+   *                   parentheses can be used to specify reoccurring fields within objects. For example, to get just the
+   *                   added date and user ID of the adder: fields=tracks.items(added_at,added_by.id). Use multiple
+   *                   parentheses to drill down into nested objects, for example:
+   *                   fields=tracks.items(track(name,href,album(name,href))). Fields can be excluded by prefixing them
+   *                   with an exclamation mark, for example: fields=tracks.items(track(name,href,album(!name,href)))
+   * @param market     (optional) an ISO 3166-1 alpha-2 country code or the string from_token. Provide this parameter if
+   *                   you want to apply Track Relinking
+   * @return a [[Playlist]] on success, otherwise it returns [[Error]]
+   */
+  def getPlaylist(playlistID: String, fields: String = "", market: String = ""): Either[Error, Playlist] = withErrorHandling {
+    val req = requests.get(f"$endpoint/playlists/$playlistID",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = (if (fields.nonEmpty) List(("fields", fields)) else Nil)
+        ++ (if (market.nonEmpty) List(("market", market)) else Nil))
+
+    val res = read[PlaylistJson](req.text)
+    Right(Playlist.fromJson(res))
+  }
+
+  /**
+   * Gets the current image associated with a specific playlist.
+   *
+   * Current playlist image for both Public and Private playlists of any user are retrievable on provision of a valid
+   * access token.
+   *
+   * @param playlistID the Spotify ID for the playlist
+   * @return a List of [[Image]]s on success, otherwise it returns [[Error]]
+   */
+  def getPlaylistCoverImage(playlistID: String): Either[Error, List[Image]] = withErrorHandling {
+    val req = requests.get(f"$endpoint/playlists/$playlistID/images",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")))
+
+    val res = read[List[Image]](req.text)
+    Right(res)
+  }
+
+  /**
+   * Gets full details of the tracks of a playlist owned by a Spotify user.
+   *
+   * Both Public and Private playlists belonging to any user are retrievable on provision of a valid access token.
+   *
+   * @param playlistID the Spotify ID for the playlist
+   * @param fields     (optional) Filters for the query: a string representing a comma-separated list of the fields to
+   *                   return. If omitted, all fields are returned. For example, to get just the total number of items and the request limit:
+   *                   fields=total,limit.
+   *
+   *                   A dot separator can be used to specify non-reoccurring fields, while parentheses can be used to
+   *                   specify reoccurring fields within objects. For example, to get just the added date and user ID of
+   *                   the adder: fields=items(added_at,added_by.id).
+   *
+   *                   Use multiple parentheses to drill down into nested objects, for example:
+   *                   fields=items(track(name,href,album(name,href))).
+   *
+   *                   Fields can be excluded by prefixing them with an exclamation mark, for example:
+   *                   fields=items.track.album(!external_urls,images)
+   * @param limit      (optional) the maximum number of items to return. Default: 100. Minimum: 1. Maximum: 100
+   * @param offset     (optional) the index of the first item to return. Default: 0 (the first object)
+   * @param market     (optional) an ISO 3166-1 alpha-2 country code or the string from_token. Provide this parameter if
+   *                   you want to apply Track Relinking
+   * @return a [[Paging]] object wrapping [[PlaylistTrack]]s on success, otherwise it returns [[Error]]
+   */
+  def getPlaylistTracks(playlistID: String, fields: String = "", limit: Int = 100, offset: Int = 0,
+                        market: String = ""): Either[Error, Paging[PlaylistTrack]] = withErrorHandling {
+    require(1 <= limit && limit <= 100, "The limit parameter must be between 1 and 100")
+    require(0 <= offset, "The offset parameter must be non-negative")
+
+    val req = requests.get(f"$endpoint/playlists/$playlistID/tracks",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = List(("limit", limit.toString), ("offset", offset.toString)) ++
+        (if (fields.nonEmpty) List(("fields", fields)) else Nil) ++
+        (if (market.nonEmpty) List(("market", market)) else Nil))
+
+    val res = read[Paging[PlaylistTrackJson]](req.text)
+    Right(res.copy(items = res.items.map(_.map(PlaylistTrack.fromJson))))
+  }
+
+  def removePlaylistItems(playlistID: String, uris: List[String], positions: List[List[Int]] = Nil, snapshotID: String = ""): Either[Error, String] = withErrorHandling {
+    require(uris.nonEmpty, "At least one Spotify URI must be specified")
+
+    if (positions.nonEmpty) {
+      val data = uris.zip(positions).map {
+        case (uri, ps) => Map("uri" -> uri, "positions" -> write(ps))
+      }
+
+      val req = requests.delete(f"$endpoint/playlists/$playlistID/tracks",
+        headers = List(("Authorization", f"Bearer ${authObj.accessToken}"), ("Content-Type", "application/json")),
+        data = List(("tracks", write(data)), ("snapshot_id", snapshotID)))
+
+      val res = read[Map[String, String]](req.text)
+      Right(res("snapshot_id"))
+    } else {
+      val req = requests.delete(f"$endpoint/playlists/$playlistID/tracks",
+        headers = List(("Authorization", f"Bearer ${authObj.accessToken}"), ("Content-Type", "application/json")),
+        data = List(("tracks", write(uris)), ("snapshot_id", snapshotID)))
+
+      val res = read[Map[String, String]](req.text)
+      Right(res("snapshot_id"))
+    }
+  }
+
+//  def reorderPlaylistItems(playlistID: String, )
 
   private case class FeaturedPlaylistsAnswer(message: String, playlists: Paging[PlaylistJson])
 

@@ -7,7 +7,7 @@ import upickle.default._
 
 case class UserJson(
                      country: Option[String] = None,
-                     display_name: String,
+                     display_name: Option[String] = None,
                      email: Option[String] = None,
                      external_urls: Map[String, String],
                      followers: Option[Followers] = None,
@@ -30,7 +30,7 @@ object UserJson {
 
 case class User(
                  country: Option[String] = None,
-                 displayName: String,
+                 displayName: Option[String] = None,
                  email: Option[String] = None,
                  externalUrls: Map[String, String],
                  followers: Option[Followers] = None,

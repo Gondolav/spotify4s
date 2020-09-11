@@ -9,7 +9,8 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     val s = Spotify(clientID, clientSecret, URI.create("http://localhost"), List("playlist-modify-public", "playlist-modify-private"))
-    println(s.getUserPlaylists("wizzler"))
+//    println(s.getCurrentUserPlaylists().map(p => s.removePlaylistItems(p.items.get.head.id)))
+//    println(s.getPlaylist("59ZbFPES4DQwEjBpWHzrtC"))
   }
 
 }

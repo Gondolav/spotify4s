@@ -5,24 +5,24 @@ import java.net.URI
 import ujson.{Null, Value}
 import upickle.default._
 
-case class PlaylistJson(
-                         collaborative: Boolean,
-                         description: String,
-                         external_urls: Map[String, String],
-                         followers: Option[Followers] = None,
-                         href: String,
-                         id: String,
-                         images: List[Image],
-                         name: String,
-                         owner: UserJson,
-                         public: Boolean,
-                         snapshot_id: String,
-                         tracks: Paging[PlaylistTrackJson],
-                         `type`: String,
-                         uri: String
-                       )
+private[spotify4s] case class PlaylistJson(
+                                            collaborative: Boolean,
+                                            description: String,
+                                            external_urls: Map[String, String],
+                                            followers: Option[Followers] = None,
+                                            href: String,
+                                            id: String,
+                                            images: List[Image],
+                                            name: String,
+                                            owner: UserJson,
+                                            public: Boolean,
+                                            snapshot_id: String,
+                                            tracks: Paging[PlaylistTrackJson],
+                                            `type`: String,
+                                            uri: String
+                                          )
 
-object PlaylistJson {
+private[spotify4s] object PlaylistJson {
   implicit val rw: ReadWriter[PlaylistJson] = macroRW
 
   implicit def OptionReader[T: Reader]: Reader[Option[T]] = reader[Value].map[Option[T]] {
@@ -49,7 +49,7 @@ case class Playlist(
                    )
 
 object Playlist {
-  def fromJson(json: PlaylistJson): Playlist = Playlist(
+  private[spotify4s] def fromJson(json: PlaylistJson): Playlist = Playlist(
     json.collaborative,
     json.description,
     json.external_urls,

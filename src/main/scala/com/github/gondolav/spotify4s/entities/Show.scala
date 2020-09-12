@@ -5,26 +5,26 @@ import java.net.URI
 import ujson.{Null, Value}
 import upickle.default._
 
-case class ShowJson(
-                     available_markets: List[String],
-                     copyrights: List[CopyrightJson],
-                     description: String,
-                     explicit: Boolean,
-                     episodes: Option[Paging[EpisodeJson]] = None,
-                     external_urls: Map[String, String],
-                     href: String,
-                     id: String,
-                     images: List[Image],
-                     is_externally_hosted: Boolean,
-                     languages: List[String],
-                     media_type: String,
-                     name: String,
-                     publisher: String,
-                     `type`: String,
-                     uri: String
-                   )
+private[spotify4s] case class ShowJson(
+                                        available_markets: List[String],
+                                        copyrights: List[CopyrightJson],
+                                        description: String,
+                                        explicit: Boolean,
+                                        episodes: Option[Paging[EpisodeJson]] = None,
+                                        external_urls: Map[String, String],
+                                        href: String,
+                                        id: String,
+                                        images: List[Image],
+                                        is_externally_hosted: Boolean,
+                                        languages: List[String],
+                                        media_type: String,
+                                        name: String,
+                                        publisher: String,
+                                        `type`: String,
+                                        uri: String
+                                      )
 
-object ShowJson {
+private[spotify4s] object ShowJson {
   implicit val rw: ReadWriter[ShowJson] = macroRW
 
   implicit def OptionReader[T: Reader]: Reader[Option[T]] = reader[Value].map[Option[T]] {
@@ -53,7 +53,7 @@ case class Show(
                ) extends Searchable
 
 object Show {
-  def fromJson(json: ShowJson): Show = if (json == null) null else
+  private[spotify4s] def fromJson(json: ShowJson): Show = if (json == null) null else
     Show(
       json.available_markets,
       json.copyrights.map(Copyright.fromJson),
@@ -74,14 +74,14 @@ object Show {
     )
 }
 
-case class SavedShowJson(added_at: String, show: ShowJson)
+private[spotify4s] case class SavedShowJson(added_at: String, show: ShowJson)
 
-object SavedShowJson {
+private[spotify4s] object SavedShowJson {
   implicit val rw: ReadWriter[SavedShowJson] = macroRW
 }
 
 case class SavedShow(addedAt: String, show: Show)
 
 object SavedShow {
-  def fromJson(json: SavedShowJson): SavedShow = SavedShow(json.added_at, Show.fromJson(json.show))
+  private[spotify4s] def fromJson(json: SavedShowJson): SavedShow = SavedShow(json.added_at, Show.fromJson(json.show))
 }

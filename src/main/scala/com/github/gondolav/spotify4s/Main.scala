@@ -8,9 +8,12 @@ object Main {
   val clientSecret = "d57182bc22304585b6837788f73bdad1"
 
   def main(args: Array[String]): Unit = {
-    val s = Spotify(clientID, clientSecret, URI.create("http://localhost"), List("playlist-modify-public", "playlist-modify-private"))
-//    println(s.getCurrentUserPlaylists().map(p => s.removePlaylistItems(p.items.get.head.id)))
-//    println(s.getPlaylist("59ZbFPES4DQwEjBpWHzrtC"))
+    val s = Spotify(clientID, clientSecret, URI.create("http://localhost"), List("playlist-modify-public", "playlist-modify-private", "ugc-image-upload"))
+
+    s.getCurrentUserProfile match {
+      case Left(value) => throw new RuntimeException
+      case Right(user) => println(user.displayName)
+    }
   }
 
 }

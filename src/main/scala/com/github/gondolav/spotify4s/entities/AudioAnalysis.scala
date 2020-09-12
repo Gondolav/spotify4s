@@ -2,15 +2,15 @@ package com.github.gondolav.spotify4s.entities
 
 import upickle.default._
 
-case class AudioAnalysisJson(
-                              bars: List[TimeInterval],
-                              beats: List[TimeInterval],
-                              sections: List[SectionJson],
-                              segments: List[SegmentJson],
-                              tatums: List[TimeInterval]
-                            )
+private[spotify4s] case class AudioAnalysisJson(
+                                                 bars: List[TimeInterval],
+                                                 beats: List[TimeInterval],
+                                                 sections: List[SectionJson],
+                                                 segments: List[SegmentJson],
+                                                 tatums: List[TimeInterval]
+                                               )
 
-object AudioAnalysisJson {
+private[spotify4s] object AudioAnalysisJson {
   implicit val rw: ReadWriter[AudioAnalysisJson] = macroRW
 }
 
@@ -23,7 +23,7 @@ case class AudioAnalysis(
                         )
 
 object AudioAnalysis {
-  def fromJson(json: AudioAnalysisJson): AudioAnalysis = AudioAnalysis(
+  private[spotify4s] def fromJson(json: AudioAnalysisJson): AudioAnalysis = AudioAnalysis(
     json.bars,
     json.beats,
     json.sections.map(Section.fromJson),
@@ -38,22 +38,22 @@ object TimeInterval {
   implicit val rw: ReadWriter[TimeInterval] = macroRW
 }
 
-case class SectionJson(
-                        start: Double,
-                        duration: Double,
-                        confidence: Double,
-                        loudness: Double,
-                        tempo: Double,
-                        tempo_confidence: Double,
-                        key: Int,
-                        key_confidence: Double,
-                        mode: Int,
-                        mode_confidence: Double,
-                        time_signature: Int,
-                        time_signature_confidence: Double
-                      )
+private[spotify4s] case class SectionJson(
+                                           start: Double,
+                                           duration: Double,
+                                           confidence: Double,
+                                           loudness: Double,
+                                           tempo: Double,
+                                           tempo_confidence: Double,
+                                           key: Int,
+                                           key_confidence: Double,
+                                           mode: Int,
+                                           mode_confidence: Double,
+                                           time_signature: Int,
+                                           time_signature_confidence: Double
+                                         )
 
-object SectionJson {
+private[spotify4s] object SectionJson {
   implicit val rw: ReadWriter[SectionJson] = macroRW
 }
 
@@ -73,7 +73,7 @@ case class Section(
                   )
 
 object Section {
-  def fromJson(json: SectionJson): Section = Section(
+  private[spotify4s] def fromJson(json: SectionJson): Section = Section(
     json.start,
     json.duration,
     json.confidence,
@@ -89,19 +89,19 @@ object Section {
   )
 }
 
-case class SegmentJson(
-                        start: Double,
-                        duration: Double,
-                        confidence: Double,
-                        loudness_start: Double,
-                        loudness_max: Double,
-                        loudness_max_time: Double,
-                        loudness_end: Double,
-                        pitches: List[Double],
-                        timbre: List[Double]
-                      )
+private[spotify4s] case class SegmentJson(
+                                           start: Double,
+                                           duration: Double,
+                                           confidence: Double,
+                                           loudness_start: Double,
+                                           loudness_max: Double,
+                                           loudness_max_time: Double,
+                                           loudness_end: Double,
+                                           pitches: List[Double],
+                                           timbre: List[Double]
+                                         )
 
-object SegmentJson {
+private[spotify4s] object SegmentJson {
   implicit val rw: ReadWriter[SegmentJson] = macroRW
 }
 
@@ -118,7 +118,7 @@ case class Segment(
                   )
 
 object Segment {
-  def fromJson(json: SegmentJson): Segment = Segment(
+  private[spotify4s] def fromJson(json: SegmentJson): Segment = Segment(
     json.start,
     json.duration,
     json.confidence,

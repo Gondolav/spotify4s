@@ -5,20 +5,20 @@ import java.net.URI
 import ujson.{Null, Value}
 import upickle.default._
 
-case class ArtistJson(
-                       external_urls: Map[String, String],
-                       followers: Option[Followers] = None,
-                       genres: Option[List[String]] = None,
-                       href: String,
-                       id: String,
-                       images: Option[List[Image]] = None,
-                       name: String,
-                       popularity: Option[Int] = None,
-                       `type`: String,
-                       uri: String
-                     )
+private[spotify4s] case class ArtistJson(
+                                          external_urls: Map[String, String],
+                                          followers: Option[Followers] = None,
+                                          genres: Option[List[String]] = None,
+                                          href: String,
+                                          id: String,
+                                          images: Option[List[Image]] = None,
+                                          name: String,
+                                          popularity: Option[Int] = None,
+                                          `type`: String,
+                                          uri: String
+                                        )
 
-object ArtistJson {
+private[spotify4s] object ArtistJson {
   implicit val rw: ReadWriter[ArtistJson] = macroRW
 
   implicit def OptionReader[T: Reader]: Reader[Option[T]] = reader[Value].map[Option[T]] {
@@ -41,7 +41,7 @@ case class Artist(
                  ) extends Searchable
 
 object Artist {
-  def fromJson(json: ArtistJson): Artist = Artist(
+  private[spotify4s] def fromJson(json: ArtistJson): Artist = Artist(
     json.external_urls,
     json.followers,
     json.genres,

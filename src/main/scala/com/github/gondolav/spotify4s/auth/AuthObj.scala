@@ -11,7 +11,7 @@ private object AuthObjJson {
 case class AuthObj(accessToken: String, tokenType: String, expiresIn: Long, refreshToken: String = "", scopes: List[String] = Nil)
 
 object AuthObj {
-  def fromJson(json: AuthObjJson): AuthObj = AuthObj(json.access_token, json.token_type, json.expires_in, json.refresh_token, json.scope.split("\\W+").toList)
+  private[spotify4s] def fromJson(json: AuthObjJson): AuthObj = AuthObj(json.access_token, json.token_type, json.expires_in, json.refresh_token, json.scope.split("\\W+").toList)
 }
 
 

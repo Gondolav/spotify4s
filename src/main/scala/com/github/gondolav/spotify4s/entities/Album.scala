@@ -5,28 +5,28 @@ import java.net.URI
 import ujson.{Null, Value}
 import upickle.default._
 
-case class AlbumJson(album_group: Option[String] = None,
-                     album_type: String,
-                     artists: List[ArtistJson],
-                     available_markets: List[String] = Nil,
-                     copyrights: Option[List[CopyrightJson]] = None,
-                     external_ids: Option[Map[String, String]] = None,
-                     external_urls: Map[String, String],
-                     genres: Option[List[String]] = None,
-                     href: String,
-                     id: String,
-                     images: List[Image],
-                     label: Option[String] = None,
-                     name: String,
-                     popularity: Option[Int] = None,
-                     release_date: String,
-                     release_date_precision: String,
-                     restrictions: Option[Restrictions] = None,
-                     tracks: Option[Paging[TrackJson]] = None,
-                     `type`: String,
-                     uri: String)
+private[spotify4s] case class AlbumJson(album_group: Option[String] = None,
+                                        album_type: String,
+                                        artists: List[ArtistJson],
+                                        available_markets: List[String] = Nil,
+                                        copyrights: Option[List[CopyrightJson]] = None,
+                                        external_ids: Option[Map[String, String]] = None,
+                                        external_urls: Map[String, String],
+                                        genres: Option[List[String]] = None,
+                                        href: String,
+                                        id: String,
+                                        images: List[Image],
+                                        label: Option[String] = None,
+                                        name: String,
+                                        popularity: Option[Int] = None,
+                                        release_date: String,
+                                        release_date_precision: String,
+                                        restrictions: Option[Restrictions] = None,
+                                        tracks: Option[Paging[TrackJson]] = None,
+                                        `type`: String,
+                                        uri: String)
 
-object AlbumJson {
+private[spotify4s] object AlbumJson {
   implicit val rw: ReadWriter[AlbumJson] = macroRW
 
   implicit def OptionReader[T: Reader]: Reader[Option[T]] = reader[Value].map[Option[T]] {
@@ -73,7 +73,7 @@ case class Album(albumGroup: Option[String] = None,
                  uri: URI) extends Searchable
 
 object Album {
-  def fromJson(json: AlbumJson): Album =
+  private[spotify4s] def fromJson(json: AlbumJson): Album =
     Album(
       json.album_group,
       AlbumType.fromString(json.album_type),
@@ -97,14 +97,14 @@ object Album {
       URI.create(json.uri))
 }
 
-case class SavedAlbumJson(added_at: String, album: AlbumJson)
+private[spotify4s] case class SavedAlbumJson(added_at: String, album: AlbumJson)
 
-object SavedAlbumJson {
+private[spotify4s] object SavedAlbumJson {
   implicit val rw: ReadWriter[SavedAlbumJson] = macroRW
 }
 
 case class SavedAlbum(addedAt: String, album: Album)
 
 object SavedAlbum {
-  def fromJson(json: SavedAlbumJson): SavedAlbum = SavedAlbum(json.added_at, Album.fromJson(json.album))
+  private[spotify4s] def fromJson(json: SavedAlbumJson): SavedAlbum = SavedAlbum(json.added_at, Album.fromJson(json.album))
 }

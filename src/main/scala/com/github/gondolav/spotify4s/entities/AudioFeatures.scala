@@ -4,28 +4,28 @@ import java.net.URI
 
 import upickle.default._
 
-case class AudioFeaturesJson(
-                              duration_ms: Int,
-                              key: Int,
-                              mode: Int,
-                              time_signature: Int,
-                              acousticness: Double,
-                              danceability: Double,
-                              energy: Double,
-                              instrumentalness: Double,
-                              liveness: Double,
-                              loudness: Double,
-                              speechiness: Double,
-                              valence: Double,
-                              tempo: Double,
-                              id: String,
-                              uri: String,
-                              track_href: String,
-                              analysis_url: String,
-                              `type`: String
-                            )
+private[spotify4s] case class AudioFeaturesJson(
+                                                 duration_ms: Int,
+                                                 key: Int,
+                                                 mode: Int,
+                                                 time_signature: Int,
+                                                 acousticness: Double,
+                                                 danceability: Double,
+                                                 energy: Double,
+                                                 instrumentalness: Double,
+                                                 liveness: Double,
+                                                 loudness: Double,
+                                                 speechiness: Double,
+                                                 valence: Double,
+                                                 tempo: Double,
+                                                 id: String,
+                                                 uri: String,
+                                                 track_href: String,
+                                                 analysis_url: String,
+                                                 `type`: String
+                                               )
 
-object AudioFeaturesJson {
+private[spotify4s] object AudioFeaturesJson {
   implicit val rw: ReadWriter[AudioFeaturesJson] = macroRW
 }
 
@@ -51,7 +51,7 @@ case class AudioFeatures(
                         )
 
 object AudioFeatures {
-  def fromJson(json: AudioFeaturesJson): AudioFeatures = AudioFeatures(
+  private[spotify4s] def fromJson(json: AudioFeaturesJson): AudioFeatures = AudioFeatures(
     json.duration_ms,
     json.key,
     json.mode,

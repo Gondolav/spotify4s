@@ -1,17 +1,18 @@
 package com.github.gondolav.spotify4s
 
 import java.net.URI
+import java.util.Base64
 
 import com.github.gondolav.spotify4s.auth._
 import com.github.gondolav.spotify4s.entities._
-import requests.{RequestFailedException, Response}
+import requests.RequestFailedException
 import upickle.default._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 
-class Spotify(authFlow: AuthFlow) {
+sealed class Spotify(authFlow: AuthFlow) {
 
   private val endpoint = "https://api.spotify.com/v1"
 
@@ -46,6 +47,14 @@ class Spotify(authFlow: AuthFlow) {
   def getAlbum(id: String, market: String = ""): Either[Error, Album] = withErrorHandling {
     val req = requests.get(f"$endpoint/albums/$id", headers = List(("Authorization", f"Bearer ${authObj.accessToken}")), params = if (market.nonEmpty) List(("market", market)) else Nil)
     Right(Album.fromJson(read[AlbumJson](req.text)))
+  }
+
+  private def withErrorHandling[T](task: => Either[Error, T]): Either[Error, T] = {
+    try {
+      task
+    } catch {
+      case e: RequestFailedException => Left(read[Error](e.response.text))
+    }
   }
 
   /**
@@ -456,14 +465,6 @@ class Spotify(authFlow: AuthFlow) {
 
     val res = read[ShowJson](req.text)
     Right(Show.fromJson(res))
-  }
-
-  private def withErrorHandling[T](task: => Either[Error, T]): Either[Error, T] = {
-    try {
-      task
-    } catch {
-      case e: RequestFailedException => Left(read[Error](e.response.text))
-    }
   }
 
   /**
@@ -1480,33 +1481,181 @@ class Spotify(authFlow: AuthFlow) {
     Right(res.copy(items = res.items.map(_.map(PlaylistTrack.fromJson))))
   }
 
-  def removePlaylistItems(playlistID: String, uris: List[String], positions: List[List[Int]] = Nil, snapshotID: String = ""): Either[Error, String] = withErrorHandling {
+  /**
+   * Removes one or more items from a user’s playlist.
+   *
+   * Removing items from a user’s public playlist requires authorization of the playlist-modify-public scope; removing
+   * items from a private playlist requires the playlist-modify-private scope.
+   *
+   * @param playlistID the Spotify ID for the playlist
+   * @param uris       a list of Spotify URIs of the items to remove. Maximum length: 100
+   * @param positions  (optional) a list of current positions of the items to remove, in the same order as the uris
+   *                   parameter. Each list of positions is zero-indexed, that is the first item in the playlist has the
+   *                   value 0, the second item 1, and so on. Maximum length: 100
+   * @param snapshotID (optional) the playlist’s snapshot ID against which you want to make the changes. The API will
+   *                   validate that the specified items exist and in the specified positions and make the changes,
+   *                   even if more recent changes have been made to the playlist
+   * @return a [[String]] representing a snapshot ID (which can be used to identify your playlist version in future
+   *         requests) on success, otherwise it returns [[Error]]
+   */
+  def removePlaylistItems(playlistID: String, uris: List[URI], positions: List[List[Int]] = Nil, snapshotID: String = ""): Either[Error, String] = withErrorHandling {
     require(uris.nonEmpty, "At least one Spotify URI must be specified")
+    require(uris.length <= 100, "The maximum number of URIs is 100")
+    require(positions.length <= 100, "The maximum number of positions is 100")
 
-    if (positions.nonEmpty) {
-      val data = uris.zip(positions).map {
-        case (uri, ps) => Map("uri" -> uri, "positions" -> write(ps))
+    val data = if (positions.nonEmpty) {
+      uris.zip(positions).map {
+        case (uri, ps) => RemovePlaylistItemsRequestTrack(uri.toString, ps)
       }
-
-      val req = requests.delete(f"$endpoint/playlists/$playlistID/tracks",
-        headers = List(("Authorization", f"Bearer ${authObj.accessToken}"), ("Content-Type", "application/json")),
-        data = List(("tracks", write(data)), ("snapshot_id", snapshotID)))
-
-      val res = read[Map[String, String]](req.text)
-      Right(res("snapshot_id"))
     } else {
-      val req = requests.delete(f"$endpoint/playlists/$playlistID/tracks",
-        headers = List(("Authorization", f"Bearer ${authObj.accessToken}"), ("Content-Type", "application/json")),
-        data = List(("tracks", write(uris)), ("snapshot_id", snapshotID)))
-
-      val res = read[Map[String, String]](req.text)
-      Right(res("snapshot_id"))
+      uris.map(uri => RemovePlaylistItemsRequestTrack(uri.toString))
     }
+
+    val req = requests.delete(f"$endpoint/playlists/$playlistID/tracks",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}"), ("Content-Type", "application/json")),
+      data = write(RemovePlaylistItemsRequest(data, if (snapshotID.nonEmpty) snapshotID else null)))
+
+    val res = read[Map[String, String]](req.text)
+    Right(res("snapshot_id"))
   }
 
-//  def reorderPlaylistItems(playlistID: String, )
+  /**
+   * Reorders an item or a group of items in a playlist.
+   *
+   * When reordering items, the timestamp indicating when they were added and the user who added them will be kept
+   * untouched. In addition, the users following the playlists won’t be notified about changes in the playlists when
+   * the items are reordered.
+   *
+   * Reordering items in the current user’s public playlists requires authorization of the playlist-modify-public scope;
+   * reordering items in the current user’s private playlist (including collaborative playlists) requires the
+   * playlist-modify-private scope.
+   *
+   * @param playlistID   the Spotify ID for the playlist
+   * @param rangeStart   the position of the first item to be reordered
+   * @param insertBefore the position where the items should be inserted.
+   *
+   *                     To reorder the items to the end of the playlist, simply set insert_before to the position
+   *                     after the last item.
+   *
+   *                     Examples:
+   *
+   *                     To reorder the first item to the last position in a playlist with 10 items, set range_start to
+   *                     0, and insert_before to 10.
+   *
+   *                     To reorder the last item in a playlist with 10 items to the start of the playlist, set
+   *                     range_start to 9, and insert_before to 0
+   * @param rangeLength  (optional) the amount of items to be reordered. Defaults to 1 if not set.
+   *
+   *                     The range of items to be reordered begins from the range_start position, and includes the
+   *                     range_length subsequent items.
+   *
+   *                     Example:
+   *
+   *                     To move the items at index 9-10 to the start of the playlist, range_start is set to 9, and
+   *                     range_length is set to 2
+   * @param snapshotID   (optional) the playlist’s snapshot ID against which you want to make the changes
+   * @return a [[String]] representing a snapshot ID (which can be used to identify your playlist version in future
+   *         requests) on success, otherwise it returns [[Error]]
+   */
+  def reorderPlaylistItems(playlistID: String, rangeStart: Int, insertBefore: Int, rangeLength: Int = 1,
+                           snapshotID: String = ""): Either[Error, String] = withErrorHandling {
+    require(0 <= rangeStart, "The rangeStart parameter must be non-negative")
+    require(0 <= insertBefore, "The insertBefore parameter must be non-negative")
+    require(1 <= rangeLength, "The rangeLength parameter must be greater than or equal to 1")
+
+    val req = requests.put(f"$endpoint/playlists/$playlistID/tracks",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}"), ("Content-Type", "application/json")),
+      data = write(ReorderPlaylistItemsRequest(rangeStart, insertBefore, rangeLength, if (snapshotID.nonEmpty) snapshotID else null)))
+
+    val res = read[Map[String, String]](req.text)
+    Right(res("snapshot_id"))
+  }
+
+  /**
+   * Replaces all the items in a playlist, overwriting its existing items. This powerful request can be useful for
+   * replacing items, re-ordering existing items, or clearing the playlist.
+   *
+   * Setting items in the current user’s public playlists requires authorization of the playlist-modify-public scope;
+   * setting items in the current user’s private playlist (including collaborative playlists) requires the
+   * playlist-modify-private scope.
+   *
+   * @param playlistID the Spotify ID for the playlist
+   * @param uris       a list of Spotify URIs to set. Maximum length: 100
+   * @return [[Unit]] on success, otherwise it returns [[Error]]
+   */
+  def replacePlaylistItems(playlistID: String, uris: List[URI]): Either[Error, Unit] = withErrorHandling {
+    require(uris.nonEmpty, "At least one Spotify URI must be specified")
+    require(uris.length <= 100, "The maximum number of URIs is 100")
+
+    val req = requests.put(f"$endpoint/playlists/$playlistID/tracks",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}"), ("Content-Type", "application/json")),
+      data = write(Map("uris" -> uris.map(_.toString))))
+
+    if (req.statusCode != 201) Left(read[Error](req.text))
+    else Right(())
+  }
+
+  /**
+   * Replaces the image used to represent a specific playlist.
+   *
+   * When the image has been provided, it is forwarded to Spotify's transcoder service in order to generate the three
+   * sizes provided in the playlist’s images object. This operation may take a short time, so performing a GET request
+   * to the playlist may not immediately return URLs to the updated images.
+   *
+   * The used access token must be tied to the user who owns the playlist, and must have the scope ugc-image-upload
+   * granted. In addition, the token must also contain playlist-modify-public and/or playlist-modify-private, depending
+   * the public status of the playlist you want to update
+   *
+   * @param playlistID the Spotify ID for the playlist
+   * @param image      an array of bytes representing the image to upload. Maximum payload size is 256 KB
+   * @return [[Unit]] on success, otherwise it returns [[Error]]
+   */
+  def uploadCustomPlaylistCoverImage(playlistID: String, image: Array[Byte]): Either[Error, Unit] =
+    uploadCustomPlaylistCoverImage(playlistID, Base64.getEncoder.encodeToString(image))
+
+  /**
+   * Replaces the image used to represent a specific playlist.
+   *
+   * When the image has been provided, it is forwarded to Spotify's transcoder service in order to generate the three
+   * sizes provided in the playlist’s images object. This operation may take a short time, so performing a GET request
+   * to the playlist may not immediately return URLs to the updated images.
+   *
+   * The used access token must be tied to the user who owns the playlist, and must have the scope ugc-image-upload
+   * granted. In addition, the token must also contain playlist-modify-public and/or playlist-modify-private, depending
+   * the public status of the playlist you want to update
+   *
+   * @param playlistID the Spotify ID for the playlist
+   * @param image      a Base64 encoded JPEG image data. Maximum payload size is 256 KB
+   * @return [[Unit]] on success, otherwise it returns [[Error]]
+   */
+  def uploadCustomPlaylistCoverImage(playlistID: String, image: String): Either[Error, Unit] = withErrorHandling {
+    val req = requests.put(f"$endpoint/playlists/$playlistID/images",
+      headers = List(("Authorization", f"Bearer ${authObj.accessToken}"), ("Content-Type", "image/jpeg")),
+      data = image)
+
+    if (req.statusCode != 202) Left(read[Error](req.text))
+    else Right(())
+  }
+
+  private case class RemovePlaylistItemsRequestTrack(uri: String, positions: List[Int] = null)
+
+  private case class RemovePlaylistItemsRequest(tracks: List[RemovePlaylistItemsRequestTrack], snapshot_id: String = null)
+
+  private case class ReorderPlaylistItemsRequest(range_start: Int, insert_before: Int, range_length: Int, snapshot_id: String = null)
 
   private case class FeaturedPlaylistsAnswer(message: String, playlists: Paging[PlaylistJson])
+
+  private object RemovePlaylistItemsRequestTrack {
+    implicit val rw: ReadWriter[RemovePlaylistItemsRequestTrack] = macroRW
+  }
+
+  private object RemovePlaylistItemsRequest {
+    implicit val rw: ReadWriter[RemovePlaylistItemsRequest] = macroRW
+  }
+
+  private object ReorderPlaylistItemsRequest {
+    implicit val rw: ReadWriter[ReorderPlaylistItemsRequest] = macroRW
+  }
 
   private object FeaturedPlaylistsAnswer { // actually used
     implicit val rw: ReadWriter[FeaturedPlaylistsAnswer] = macroRW

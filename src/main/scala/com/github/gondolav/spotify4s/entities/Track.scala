@@ -5,30 +5,30 @@ import java.net.URI
 import ujson.{Null, Value}
 import upickle.default._
 
-case class TrackJson(
-                      album: Option[AlbumJson] = None,
-                      artists: List[ArtistJson],
-                      available_markets: List[String] = Nil,
-                      disc_number: Int,
-                      duration_ms: Int,
-                      explicit: Boolean,
-                      external_ids: Option[Map[String, String]] = None,
-                      external_urls: Map[String, String],
-                      href: String,
-                      id: String,
-                      is_playable: Option[Boolean] = None,
-                      linked_from: Option[LinkedTrackJson] = None,
-                      restrictions: Option[Restrictions] = None,
-                      name: String,
-                      popularity: Option[Int] = None,
-                      preview_url: String,
-                      track_number: Int,
-                      `type`: String,
-                      uri: String,
-                      is_local: Boolean
-                    )
+private[spotify4s] case class TrackJson(
+                                         album: Option[AlbumJson] = None,
+                                         artists: List[ArtistJson],
+                                         available_markets: List[String] = Nil,
+                                         disc_number: Int,
+                                         duration_ms: Int,
+                                         explicit: Boolean,
+                                         external_ids: Option[Map[String, String]] = None,
+                                         external_urls: Map[String, String],
+                                         href: String,
+                                         id: String,
+                                         is_playable: Option[Boolean] = None,
+                                         linked_from: Option[LinkedTrackJson] = None,
+                                         restrictions: Option[Restrictions] = None,
+                                         name: String,
+                                         popularity: Option[Int] = None,
+                                         preview_url: String,
+                                         track_number: Int,
+                                         `type`: String,
+                                         uri: String,
+                                         is_local: Boolean
+                                       )
 
-object TrackJson {
+private[spotify4s] object TrackJson {
   implicit val rw: ReadWriter[TrackJson] = macroRW
 
   implicit def OptionReader[T: Reader]: Reader[Option[T]] = reader[Value].map[Option[T]] {
@@ -61,7 +61,7 @@ case class Track(
                 ) extends Searchable
 
 object Track {
-  def fromJson(json: TrackJson): Track = Track(
+  private[spotify4s] def fromJson(json: TrackJson): Track = Track(
     json.album.map(album => Album.fromJson(album)),
     json.artists.map(Artist.fromJson),
     json.available_markets,
@@ -85,14 +85,14 @@ object Track {
   )
 }
 
-case class SavedTrackJson(added_at: String, track: TrackJson)
+private[spotify4s] case class SavedTrackJson(added_at: String, track: TrackJson)
 
-object SavedTrackJson {
+private[spotify4s] object SavedTrackJson {
   implicit val rw: ReadWriter[SavedTrackJson] = macroRW
 }
 
 case class SavedTrack(addedAt: String, track: Track)
 
 object SavedTrack {
-  def fromJson(json: SavedTrackJson): SavedTrack = SavedTrack(json.added_at, Track.fromJson(json.track))
+  private[spotify4s] def fromJson(json: SavedTrackJson): SavedTrack = SavedTrack(json.added_at, Track.fromJson(json.track))
 }

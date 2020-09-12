@@ -5,28 +5,28 @@ import java.net.URI
 import ujson.{Null, Value}
 import upickle.default._
 
-case class EpisodeJson(
-                        audio_preview_url: String,
-                        description: String,
-                        duration_ms: Int,
-                        explicit: Boolean,
-                        external_urls: Map[String, String],
-                        href: String,
-                        id: String,
-                        images: List[Image],
-                        is_externally_hosted: Boolean,
-                        is_playable: Boolean,
-                        languages: List[String],
-                        name: String,
-                        release_date: String,
-                        release_date_precision: String,
-                        resume_point: Option[ResumePointJson] = None,
-                        show: Option[ShowJson] = None,
-                        `type`: String,
-                        uri: String
-                      )
+private[spotify4s] case class EpisodeJson(
+                                           audio_preview_url: String,
+                                           description: String,
+                                           duration_ms: Int,
+                                           explicit: Boolean,
+                                           external_urls: Map[String, String],
+                                           href: String,
+                                           id: String,
+                                           images: List[Image],
+                                           is_externally_hosted: Boolean,
+                                           is_playable: Boolean,
+                                           languages: List[String],
+                                           name: String,
+                                           release_date: String,
+                                           release_date_precision: String,
+                                           resume_point: Option[ResumePointJson] = None,
+                                           show: Option[ShowJson] = None,
+                                           `type`: String,
+                                           uri: String
+                                         )
 
-object EpisodeJson {
+private[spotify4s] object EpisodeJson {
   implicit val rw: ReadWriter[EpisodeJson] = macroRW
 
   implicit def OptionReader[T: Reader]: Reader[Option[T]] = reader[Value].map[Option[T]] {
@@ -57,7 +57,7 @@ case class Episode(
                   ) extends Searchable
 
 object Episode {
-  def fromJson(json: EpisodeJson): Episode = if (json == null) null else
+  private[spotify4s] def fromJson(json: EpisodeJson): Episode = if (json == null) null else
     Episode(
       json.audio_preview_url,
       json.description,

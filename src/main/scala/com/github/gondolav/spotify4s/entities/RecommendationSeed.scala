@@ -11,5 +11,5 @@ case class RecommendationSeed(
                                `type`: String)
 
 object RecommendationSeed {
-  implicit val rw: ReadWriter[RecommendationSeed] = macroRW
+  private[spotify4s] implicit val rw: ReadWriter[RecommendationSeed] = macroRW
 }

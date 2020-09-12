@@ -5,5 +5,5 @@ import upickle.default._
 case class Image(height: Int, url: String, width: Int)
 
 object Image {
-  implicit val rw: ReadWriter[Image] = macroRW
+  private[spotify4s] implicit val rw: ReadWriter[Image] = macroRW
 }

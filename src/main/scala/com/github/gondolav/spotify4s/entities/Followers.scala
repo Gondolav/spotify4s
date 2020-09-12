@@ -5,5 +5,5 @@ import upickle.default._
 case class Followers(href: String, total: Int)
 
 object Followers {
-  implicit val rw: ReadWriter[Followers] = macroRW
+  private[spotify4s] implicit val rw: ReadWriter[Followers] = macroRW
 }

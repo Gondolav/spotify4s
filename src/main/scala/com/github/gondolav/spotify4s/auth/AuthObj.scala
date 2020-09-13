@@ -9,7 +9,7 @@ private object AuthObjJson {
 }
 
 /**
- * Stores the data received upon successful authorization.
+ * Stores the data received upon successful authorization, such as the access token.
  */
 case class AuthObj(accessToken: String, tokenType: String, expiresIn: Long, refreshToken: String = "", scopes: List[String] = Nil)
 

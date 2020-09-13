@@ -1,7 +1,8 @@
 package com.github.gondolav
 
 /**
- * This is the documentation for [[https://github.com/Gondolav/spotify4s spotify4s]], an intuitive and lightweight Scala library for the Spotify Web API.
+ * This is the documentation for [[https://github.com/Gondolav/spotify4s spotify4s]], an intuitive and lightweight
+ * Scala library for the [[https://developer.spotify.com/documentation/web-api/#response-schema Spotify Web API]].
  *
  * == Package structure ==
  *

@@ -15,3 +15,7 @@ git.remoteRepo := "git@github.com:Gondolav/spotify4s.git"
 excludeFilter in ghpagesCleanSite :=
   ((f: File) => (ghpagesRepository.value / "index.html").getCanonicalPath == f.getCanonicalPath)
 
+crossPaths := false
+
+publishTo := sonatypePublishToBundle.value
+

@@ -8,6 +8,9 @@ private object AuthObjJson {
   implicit val rw: ReadWriter[AuthObjJson] = macroRW
 }
 
+/**
+ * Stores the data received upon successful authorization.
+ */
 case class AuthObj(accessToken: String, tokenType: String, expiresIn: Long, refreshToken: String = "", scopes: List[String] = Nil)
 
 object AuthObj {

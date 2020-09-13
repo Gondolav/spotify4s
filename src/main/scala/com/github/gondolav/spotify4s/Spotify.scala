@@ -12,17 +12,31 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 
-sealed class Spotify(authFlow: AuthFlow) {
+/**
+ * A Spotify API client. Instantiating a client triggers automatically the authorization flow passed as parameter.
+ *
+ * @param authFlow the authorization flow to use.
+ */
+final class Spotify(authFlow: AuthFlow) {
 
-  private val endpoint = "https://api.spotify.com/v1"
+  private val endpoint = "https://api.spotify.com/v1" // API endpoint
 
+  /**
+   * The authentication object associated to this client.
+   */
   var authObj: AuthObj = authFlow.authenticate match {
     case Left(error) => throw new AuthException(f"An error occurred while authenticating: '${error.errorDescription}'\n", error)
-    case Right(value) => value
+    case Right(obj) => obj
   }
 
+  /**
+   * A Spotify API client. It uses the Client Credentials authorization flow.
+   */
   def this(clientID: String, clientSecret: String) = this(ClientCredentials(clientID, clientSecret))
 
+  /**
+   * A Spotify API client. It uses by default the Authorization Code flow.
+   */
   def this(clientID: String, clientSecret: String, redirectURI: URI, scopes: List[String] = Nil, withPKCE: Boolean = false) =
     this(if (withPKCE) AuthCodeWithPKCE(clientID, clientSecret, redirectURI, scopes) else AuthCode(clientID, clientSecret, redirectURI, scopes))
 
@@ -47,14 +61,6 @@ sealed class Spotify(authFlow: AuthFlow) {
   def getAlbum(id: String, market: String = ""): Either[Error, Album] = withErrorHandling {
     val req = requests.get(f"$endpoint/albums/$id", headers = List(("Authorization", f"Bearer ${authObj.accessToken}")), params = if (market.nonEmpty) List(("market", market)) else Nil)
     Right(Album.fromJson(read[AlbumJson](req.text)))
-  }
-
-  private def withErrorHandling[T](task: => Either[Error, T]): Either[Error, T] = {
-    try {
-      task
-    } catch {
-      case e: RequestFailedException => Left(read[Error](e.response.text))
-    }
   }
 
   /**
@@ -368,6 +374,14 @@ sealed class Spotify(authFlow: AuthFlow) {
 
     val res = read[Map[String, List[ArtistJson]]](req.text)
     Right(res("artists").map(Artist.fromJson))
+  }
+
+  private def withErrorHandling[T](task: => Either[Error, T]): Either[Error, T] = {
+    try {
+      task
+    } catch {
+      case e: RequestFailedException => Left(read[Error](e.response.text))
+    }
   }
 
   /**
@@ -1664,10 +1678,21 @@ sealed class Spotify(authFlow: AuthFlow) {
 }
 
 object Spotify {
+  /**
+   * A Spotify API client. Instantiating a client triggers automatically the authorization flow passed as parameter.
+   *
+   * @param authFlow the authorization flow to use.
+   */
   def apply(authFlow: AuthFlow): Spotify = new Spotify(authFlow)
 
+  /**
+   * A Spotify API client. It uses the Client Credentials authorization flow.
+   */
   def apply(clientID: String, clientSecret: String): Spotify = new Spotify(clientID, clientSecret)
 
+  /**
+   * A Spotify API client. It uses by default the Authorization Code flow.
+   */
   def apply(clientID: String, clientSecret: String, redirectURI: URI, scopes: List[String] = Nil, withPKCE: Boolean = false): Spotify =
     new Spotify(clientID, clientSecret, redirectURI, scopes, withPKCE)
 }

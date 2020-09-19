@@ -4,6 +4,14 @@
 
 An intuitive and lightweight Scala library for the Spotify Web API.
 
+- [Features](#features)
+- [Installation](#installation)
+- [Documentation](#documentation)
+- [Usage](#usage)
+- [Contributing](#contributing)
+- [Acknowledgements](#acknowledgements)
+- [License](#license)
+
 # Features
 
 spotify4s supports all the features of the [Spotify Web API](https://developer.spotify.com/documentation/web-api/), with the sole exception of the Player API (in beta).
@@ -24,7 +32,7 @@ The full API reference is available at [spotify4s documentation](https://gondola
 
 # Usage
 
-To get started, install spotify4s and create an app on [Spotify](https://developer.spotify.com/dashboard/). Since all methods (and endpoints) require [user authorization](https://developer.spotify.com/documentation/general/guides/authorization-guide/), you will need the app's credentials (client id and client secret) generated upon registration.
+To get started, install spotify4s and create an app on [Spotify](https://developer.spotify.com/dashboard/). Since all methods (and endpoints) require [user authorization](https://developer.spotify.com/documentation/general/guides/authorization-guide/), you will need the app's credentials (client id and client secret), generated upon registration.
 
 The library supports two [authorization flows](https://gondolav.github.io/spotify4s/latest/api/com/github/gondolav/spotify4s/auth/index.html):
 

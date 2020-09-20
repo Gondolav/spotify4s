@@ -1,6 +1,6 @@
 # spotify4s
 
-![Scala CI](https://github.com/Gondolav/spotify4s/workflows/Scala%20CI/badge.svg) [![Join the chat at https://gitter.im/spotify4s/community](https://badges.gitter.im/spotify4s/community.svg)](https://gitter.im/spotify4s/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+![Scala CI](https://github.com/Gondolav/spotify4s/workflows/Scala%20CI/badge.svg) [![Join the chat at https://gitter.im/spotify4s/community](https://badges.gitter.im/spotify4s/community.svg)](https://gitter.im/spotify4s/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) [![codecov](https://codecov.io/gh/Gondolav/spotify4s/branch/add-tests/graph/badge.svg)](https://codecov.io/gh/Gondolav/spotify4s)
 
 An intuitive and lightweight Scala library for the Spotify Web API.
 

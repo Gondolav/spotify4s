@@ -6,7 +6,7 @@ object AuthErrorTests extends TestSuite {
   val tests = Tests {
     test("fromJson correctly works") {
       val error = "error"
-      val errorDescription = "errorDescription"
+      val errorDescription = Some("errorDescription")
       val json = AuthErrorJson(error, errorDescription)
       assert(AuthError.fromJson(json) == AuthError(error, errorDescription))
     }

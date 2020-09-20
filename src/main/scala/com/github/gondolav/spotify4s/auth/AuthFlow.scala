@@ -54,8 +54,8 @@ case class AuthCode(clientID: String, clientSecret: String, redirectURI: URI, sc
       split(1)
     }
 
-    if (state != stateReceived) return Left(AuthError("Wrong state", f"Wrong state: expected $state, received $stateReceived"))
-    if (codeKey != "code") return Left(AuthError("Error while authenticating", f"Reason: $code"))
+    if (state != stateReceived) return Left(AuthError("Wrong state", Some(f"Wrong state: expected $state, received $stateReceived")))
+    if (codeKey != "code") return Left(AuthError("Error while authenticating", Some(f"Reason: $code")))
 
     try {
       val req = requests.post(endpoint, headers = List(("Authorization", f"Basic $encodedAuth")),
@@ -78,7 +78,7 @@ case class AuthCode(clientID: String, clientSecret: String, redirectURI: URI, sc
 }
 
 /**
- * The [[https://developer.spotify.com/documentation/general/guides/authorization-guide/#authorization-code-flow-with-proof-key-for-code-exchange-pkce Authorization Code Flow with Proof Key for Code Exchange (PKCE)]].
+ * NOT IMPLEMENTED YET. The [[https://developer.spotify.com/documentation/general/guides/authorization-guide/#authorization-code-flow-with-proof-key-for-code-exchange-pkce Authorization Code Flow with Proof Key for Code Exchange (PKCE)]].
  *
  * The authorization code flow with PKCE is the best option for mobile and desktop applications where it is unsafe to
  * store your client secret. It provides your app with an access token that can be refreshed.
@@ -122,6 +122,6 @@ case class ClientCredentials(clientID: String, clientSecret: String) extends Aut
   }
 
   override private[spotify4s] def requestRefreshedToken(refreshToken: String): Either[AuthError, AuthObj] =
-    Left(AuthError("Cannot refresh token", "Cannot refresh token with client credentials flow"))
+    Left(AuthError("Cannot refresh token", Some("Cannot refresh token with client credentials flow")))
 }
 

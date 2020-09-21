@@ -8,7 +8,8 @@ case class RecommendationSeed(
                                href: String,
                                id: String,
                                initialPoolSize: Int,
-                               `type`: String)
+                               `type`: String
+                             )
 
 object RecommendationSeed {
   private[spotify4s] implicit val rw: ReadWriter[RecommendationSeed] = macroRW

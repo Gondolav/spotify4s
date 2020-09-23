@@ -59,7 +59,8 @@ final class Spotify(authFlow: AuthFlow) {
    * @return an [[Album]] on success, otherwise it returns [[Error]]
    */
   def getAlbum(id: String, market: String = ""): Either[Error, Album] = withErrorHandling {
-    val req = requests.get(f"$endpoint/albums/$id", headers = List(("Authorization", f"Bearer ${authObj.accessToken}")), params = if (market.nonEmpty) List(("market", market)) else Nil)
+    val req = requests.get(f"$endpoint/albums/$id", headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
+      params = if (market.nonEmpty) List(("market", market)) else Nil)
     Right(Album.fromJson(read[AlbumJson](req.text)))
   }
 
@@ -287,7 +288,7 @@ final class Spotify(authFlow: AuthFlow) {
                          seedArtists: List[String] = Nil, seedGenres: List[String] = Nil,
                          seedTracks: List[String] = Nil): Either[Error, Recommendations] = withErrorHandling {
     require(1 <= limit && limit <= 100, "The limit parameter must be between 1 and 100")
-    require(!(seedArtists.isEmpty || seedGenres.isEmpty || seedTracks.isEmpty), "At least one seed must be provided")
+    require(seedArtists.nonEmpty || seedGenres.nonEmpty || seedTracks.nonEmpty, "At least one seed must be provided")
 
     val req = requests.get(f"$endpoint/recommendations",
       headers = List(("Authorization", f"Bearer ${authObj.accessToken}")),
